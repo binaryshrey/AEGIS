@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const menuItems = [
   { name: "Github", href: "https://github.com/binaryshrey" },
-  { name: "Status", href: "/dashboard" },
+  { name: "Status", href: "https://aegis-starsling.betteruptime.com/" },
   { name: "Contact", href: "https://www.linkedin.com/in/shreyanshsaurabh" },
 ];
 

@@ -64,7 +64,7 @@ const data = {
     },
     {
       title: "Status",
-      url: "#",
+      url: "https://aegis-starsling.betteruptime.com/",
       icon: RiHeartLine,
     },
     {

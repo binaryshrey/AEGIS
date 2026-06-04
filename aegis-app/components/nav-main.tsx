@@ -43,7 +43,7 @@ export function NavMain({
                   isActive={isActive}
                   className="text-base"
                 >
-                  <Link href={item.url}>
+                  <Link href={item.url} {...(item.url.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
                     {item.icon && <item.icon className="!size-5" />}
                     <span>{item.title}</span>
                   </Link>
