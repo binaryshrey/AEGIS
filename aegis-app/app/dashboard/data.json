@@ -1,0 +1,32 @@
+[
+  {
+    "id": 47,
+    "run": "#47",
+    "score": 3842,
+    "winRate": "94.6%",
+    "avgMoves": 52.7,
+    "opponents": 25,
+    "date": "Today",
+    "status": "Complete"
+  },
+  {
+    "id": 46,
+    "run": "#46",
+    "score": 3761,
+    "winRate": "93.3%",
+    "avgMoves": 54.1,
+    "opponents": 25,
+    "date": "Today",
+    "status": "Complete"
+  },
+  {
+    "id": 45,
+    "run": "#45",
+    "score": 3598,
+    "winRate": "89.2%",
+    "avgMoves": 58.8,
+    "opponents": 25,
+    "date": "Yesterday",
+    "status": "Complete"
+  }
+]
