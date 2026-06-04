@@ -9,6 +9,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const ENGINE_SERVER_URL = process.env.ENGINE_SERVER_URL || "http://localhost:5001";
+const isLocal = ENGINE_SERVER_URL.includes("localhost");
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface GameRecord {
@@ -165,8 +168,7 @@ async function fetchHistoricalRuns(battleId: string, maxRuns: number = 15): Prom
 
 // ── Core JSONL parser ────────────────────────────────────────────────────────
 
-function parseBattleLog(logFile: string) {
-  const raw = fs.readFileSync(logFile, "utf-8");
+function parseBattleLogContent(raw: string) {
   const lines = raw.split("\n").filter((l) => l.trim());
 
   const games: GameRecord[] = [];
@@ -279,15 +281,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid or missing id" }, { status: 400 });
   }
 
-  const engineDir = path.resolve(process.cwd(), "..");
-  const logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
+  let logContent: string;
 
-  if (!fs.existsSync(logFile)) {
-    return NextResponse.json({ error: "Log file not found" }, { status: 404 });
+  if (isLocal) {
+    const engineDir = path.resolve(process.cwd(), "..");
+    const logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
+    if (!fs.existsSync(logFile)) {
+      return NextResponse.json({ error: "Log file not found" }, { status: 404 });
+    }
+    logContent = fs.readFileSync(logFile, "utf-8");
+  } else {
+    const res = await fetch(`${ENGINE_SERVER_URL}/engine/raw-log?id=${battleId}`);
+    if (!res.ok) {
+      return NextResponse.json({ error: "Log file not found" }, { status: 404 });
+    }
+    logContent = await res.text();
   }
 
   // Parse current + fetch Supabase data in parallel
-  const current = parseBattleLog(logFile);
+  const current = parseBattleLogContent(logContent);
   const [serverScore, prevRun, historicalRuns] = await Promise.all([
     fetchRunScore(battleId),
     fetchPreviousRun(battleId),

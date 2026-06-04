@@ -4,6 +4,9 @@ import fs from "fs";
 
 export const dynamic = "force-dynamic";
 
+const ENGINE_SERVER_URL = process.env.ENGINE_SERVER_URL || "http://localhost:5001";
+const isLocal = ENGINE_SERVER_URL.includes("localhost");
+
 export async function GET(req: NextRequest) {
   const battleId = req.nextUrl.searchParams.get("id");
 
@@ -11,11 +14,30 @@ export async function GET(req: NextRequest) {
     return new Response("Missing id", { status: 400 });
   }
 
-  // Sanitize battleId to prevent path traversal
   if (!/^[a-f0-9-]+$/i.test(battleId)) {
     return new Response("Invalid id", { status: 400 });
   }
 
+  // Production: proxy SSE from Render backend
+  if (!isLocal) {
+    const upstream = await fetch(`${ENGINE_SERVER_URL}/engine/logs?id=${battleId}`, {
+      headers: { Accept: "text/event-stream" },
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      return new Response("Failed to connect to engine", { status: 502 });
+    }
+
+    return new Response(upstream.body, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  }
+
+  // Local dev: read JSONL file directly
   const engineDir = path.resolve(process.cwd(), "..");
   const logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
 
@@ -27,7 +49,7 @@ export async function GET(req: NextRequest) {
       let offset = 0;
       let doneEventSeen = false;
       let waitingTicks = 0;
-      const MAX_WAIT = 300; // ~5 minutes at 1s intervals
+      const MAX_WAIT = 300;
 
       const poll = () => {
         if (cancelled || doneEventSeen) {

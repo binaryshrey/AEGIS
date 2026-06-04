@@ -425,6 +425,142 @@ async def get_dashboard():
     }
 
 
+# -- Engine control (for prod — Vercel proxies here) ----------------------------
+
+import os
+import subprocess
+import asyncio
+
+_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "battles")
+os.makedirs(_LOG_DIR, exist_ok=True)
+
+
+@app.post("/engine/start")
+async def engine_start(request: Request):
+    """Start the AEGIS engine as a subprocess."""
+    body = await request.json()
+    battle_id = body.get("battleId")
+    if not battle_id:
+        return JSONResponse(status_code=400, content={"error": "battleId is required"})
+
+    log_file = os.path.join(_LOG_DIR, f"{battle_id}.jsonl")
+    engine_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    server_url = f"http://localhost:{os.environ.get('PORT', '5001')}"
+
+    proc = subprocess.Popen(
+        [
+            "python", "-m", "engine.main",
+            "--url", server_url,
+            "--competition", COMPETITION_ID,
+            "--rounds", "1",
+            "--battle-id", battle_id,
+            "--log", log_file,
+        ],
+        cwd=engine_dir,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return {"ok": True, "battleId": battle_id, "pid": proc.pid}
+
+
+@app.get("/engine/logs")
+async def engine_logs(id: str):
+    """SSE stream of battle log events."""
+    import re
+    if not re.match(r'^[a-f0-9-]+$', id, re.IGNORECASE):
+        return JSONResponse(status_code=400, content={"error": "Invalid id"})
+
+    log_file = os.path.join(_LOG_DIR, f"{id}.jsonl")
+
+    from starlette.responses import StreamingResponse
+    import json
+
+    async def event_stream():
+        offset = 0
+        wait_ticks = 0
+        max_wait = 600  # ~5 min at 0.5s
+
+        while True:
+            if not os.path.exists(log_file):
+                wait_ticks += 1
+                if wait_ticks > max_wait:
+                    yield f"data: {json.dumps({'event': 'error', 'data': {'message': 'Log file never appeared'}})}\n\n"
+                    return
+                await asyncio.sleep(0.5)
+                continue
+
+            stat = os.stat(log_file)
+            if stat.st_size > offset:
+                with open(log_file, "r") as f:
+                    f.seek(offset)
+                    chunk = f.read()
+                    offset = stat.st_size
+
+                for line in chunk.strip().split("\n"):
+                    if not line.strip():
+                        continue
+                    try:
+                        parsed = json.loads(line)
+                        yield f"data: {json.dumps(parsed)}\n\n"
+                        if parsed.get("event") == "run_ended":
+                            return
+                    except json.JSONDecodeError:
+                        pass
+
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+    })
+
+
+@app.get("/engine/download")
+async def engine_download(id: str):
+    """Download formatted battle logs as .txt."""
+    import re, json
+    if not re.match(r'^[a-f0-9-]+$', id, re.IGNORECASE):
+        return JSONResponse(status_code=400, content={"error": "Invalid id"})
+
+    log_file = os.path.join(_LOG_DIR, f"{id}.jsonl")
+    if not os.path.exists(log_file):
+        return JSONResponse(status_code=404, content={"error": "Log file not found"})
+
+    with open(log_file, "r") as f:
+        content = f.read()
+
+    lines = content.strip().split("\n")
+    formatted = "\n\n---\n\n".join(
+        json.dumps(json.loads(l), indent=2) if l.strip() else l
+        for l in lines if l.strip()
+    )
+
+    from starlette.responses import Response
+    return Response(
+        content=formatted,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="battle-logs-{id}.txt"'},
+    )
+
+
+@app.get("/engine/raw-log")
+async def engine_raw_log(id: str):
+    """Return raw JSONL log content for analytics parsing."""
+    import re, json
+    if not re.match(r'^[a-f0-9-]+$', id, re.IGNORECASE):
+        return JSONResponse(status_code=400, content={"error": "Invalid id"})
+
+    log_file = os.path.join(_LOG_DIR, f"{id}.jsonl")
+    if not os.path.exists(log_file):
+        return JSONResponse(status_code=404, content={"error": "Log file not found"})
+
+    with open(log_file, "r") as f:
+        content = f.read()
+
+    from starlette.responses import Response
+    return Response(content=content, media_type="text/plain")
+
+
 if __name__ == "__main__":
     import uvicorn
     print(f"\n  Mock StarSling server  ->  http://localhost:5001")
