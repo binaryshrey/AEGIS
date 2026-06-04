@@ -6,7 +6,7 @@ yourFleet mirrors placement format + sunk flag (matches real API).
 incomingShots includes outcome and sunkShipClass (matches real API).
 """
 import random
-from backend.bots import BOARD_SIZE, SINK_BONUSES
+from bots import BOARD_SIZE, SINK_BONUSES
 
 SHIP_SIZES = {
     "CARRIER": 5, "BATTLESHIP": 4,

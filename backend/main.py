@@ -9,7 +9,7 @@ Response envelope structure mirrors real API (ADR 0009):
   ATTEMPT_DISQUALIFIED -> { responseType, reason, ranked, attemptId, context }
 
 Run with:
-  uvicorn backend.main:app --port 5001 --reload
+  cd backend && uvicorn main:app --port 5001 --reload
 """
 import uuid
 
@@ -17,8 +17,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.bots import BOTS, BOT_POOL, BOARD_SIZE, SHIP_CLASSES, SINK_BONUSES, pick_roster
-from backend.game_engine import GameState
+from bots import BOTS, BOT_POOL, BOARD_SIZE, SHIP_CLASSES, SINK_BONUSES, pick_roster
+from game_engine import GameState
 
 app = FastAPI(title="StarSling Mock Server")
 
