@@ -713,7 +713,7 @@ def _record_game(gs, model, memory, bandit_store, feedback, emitter,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url",         default="http://localhost:5001")
+    parser.add_argument("--url",         default=os.environ.get("ENGINE_SERVER_URL", "https://aegis-n8at.onrender.com"))
     parser.add_argument("--competition", default="mock-competition")
     parser.add_argument("--memory",      default="data/memory.json")
     parser.add_argument("--lessons",     default="data/lessons.json")

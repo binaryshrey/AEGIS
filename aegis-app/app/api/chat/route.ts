@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       headers: {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://aegis.starsling.dev",
+        "HTTP-Referer": "https://aegis-starsling.vercel.app",
         "X-Title": "AEGIS AI",
       },
       body: JSON.stringify({

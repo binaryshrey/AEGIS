@@ -24,7 +24,7 @@ def _mint_token() -> str:
 
 class Client:
     def __init__(self,
-                 base_url:       str = "http://localhost:5001",
+                 base_url:       str = "https://aegis-n8at.onrender.com",
                  competition_id: str = "mock-competition"):
         self.base           = base_url.rstrip("/")
         self.competition_id = competition_id
