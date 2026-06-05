@@ -1,6 +1,6 @@
 # AEGIS: Adaptive Exploitation & Game Intelligence System ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white) ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) ![NumPy](https://img.shields.io/badge/NumPy-013243?logo=numpy&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 
-![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/snapshot.webp)
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/banner.webp)
 
 AEGIS is an autonomous closed-loop battleship agent that detects opponent placement and firing patterns, exploits them through Thompson Sampling and Bayesian inference, and climbs the leaderboard faster with every game it plays. The system includes a full-featured real-time dashboard for monitoring battles, analyzing performance, and reviewing the agent's learning process across multiple runs. It also features an AI-powered chat assistant for strategy and observability questions, and a CLI for launching battles from the terminal.
 
@@ -74,6 +74,8 @@ Scoring per game is calculated as follows. Each hit and each sink adds to the sc
 Each attempt consists of 15 sequential games against 15 different opponents. The agent plays all games in a single attempt, and the total score is the sum of all individual game scores.
 
 ## Agent Architecture
+
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/arena.webp)
 
 The agent is composed of several cooperating subsystems, each responsible for a specific aspect of decision-making:
 
@@ -212,10 +214,10 @@ trust = stability * prediction_accuracy * sample_confidence
 
 The trust score gates access to increasingly aggressive capabilities:
 
-| Trust Level | Range          | Capabilities                                                                                                                                               |
-| ----------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Untrusted   | Below 0.15     | No heatmap blending, no exploit, no memory priors. The agent plays as if it has never seen this opponent.                                                  |
-| Low trust   | 0.15 to 0.35   | Weak heatmap boost applied (weight = trust \* 5, so 0.2 trust yields 1.0x heatmap weight). Dangerous square avoidance and top-row hard-avoid enabled for placement. No exploit.   |
+| Trust Level | Range          | Capabilities                                                                                                                                                                            |
+| ----------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Untrusted   | Below 0.15     | No heatmap blending, no exploit, no memory priors. The agent plays as if it has never seen this opponent.                                                                               |
+| Low trust   | 0.15 to 0.35   | Weak heatmap boost applied (weight = trust \* 5, so 0.2 trust yields 1.0x heatmap weight). Dangerous square avoidance and top-row hard-avoid enabled for placement. No exploit.         |
 | Trusted     | 0.35 and above | Full heatmap blending (8.0x boost at trust >= 0.7). Exploit strategy becomes available if other criteria (stability above 0.65, prediction accuracy above 0.80, 5+ games) are also met. |
 
 ### Model Reset
@@ -478,20 +480,20 @@ Every significant event during a run is logged to a JSONL (JSON Lines) file at `
 
 ### Event Types
 
-| Event              | When                       | Key Data                                                                                            |
-| ------------------ | -------------------------- | --------------------------------------------------------------------------------------------------- |
-| `run_started`      | Engine initializes         | Configuration, competition ID                                                                       |
-| `registered`       | Rules received from server | Turn timeout, number of opponents, ship classes                                                     |
-| `attempt_started`  | New attempt begins         | Attempt number                                                                                      |
-| `game_started`     | Game within attempt begins | Game number, opponent ID, known placement/firing flags, strategy chosen                             |
-| `move`             | Each shot fired            | Turn number, row, column, result, elapsed milliseconds, strategy, confidence                        |
-| `pattern_detected` | Exploitable pattern found  | Opponent ID, pattern type, games confirmed, detail                                                  |
-| `strategy_changed` | Mid-game strategy switch   | Old strategy, new strategy, reason                                                                  |
-| `game_ended`       | Game completes             | Won/lost, total moves, avg latency, improvement delta, ships lost, hits received, enemy cells left  |
-| `memory_updated`   | Opponent model persisted   | Opponent ID, trust score, stability, classification                                                 |
-| `attempt_ended`    | All 15 games complete      | Wins, losses, per-game summaries                                                                    |
-| `learning_curve`   | Cross-attempt trend        | Aggregated win rate and move trends across attempts                                                 |
-| `run_ended`        | Engine shuts down          | Final statistics                                                                                    |
+| Event              | When                       | Key Data                                                                                           |
+| ------------------ | -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `run_started`      | Engine initializes         | Configuration, competition ID                                                                      |
+| `registered`       | Rules received from server | Turn timeout, number of opponents, ship classes                                                    |
+| `attempt_started`  | New attempt begins         | Attempt number                                                                                     |
+| `game_started`     | Game within attempt begins | Game number, opponent ID, known placement/firing flags, strategy chosen                            |
+| `move`             | Each shot fired            | Turn number, row, column, result, elapsed milliseconds, strategy, confidence                       |
+| `pattern_detected` | Exploitable pattern found  | Opponent ID, pattern type, games confirmed, detail                                                 |
+| `strategy_changed` | Mid-game strategy switch   | Old strategy, new strategy, reason                                                                 |
+| `game_ended`       | Game completes             | Won/lost, total moves, avg latency, improvement delta, ships lost, hits received, enemy cells left |
+| `memory_updated`   | Opponent model persisted   | Opponent ID, trust score, stability, classification                                                |
+| `attempt_ended`    | All 15 games complete      | Wins, losses, per-game summaries                                                                   |
+| `learning_curve`   | Cross-attempt trend        | Aggregated win rate and move trends across attempts                                                |
+| `run_ended`        | Engine shuts down          | Final statistics                                                                                   |
 
 The JSONL file is line-buffered and append-only, which allows the dashboard to stream events in real time by polling the file for new lines.
 
@@ -505,11 +507,11 @@ The dashboard is a Next.js web application that provides real-time monitoring, h
 
 **Dashboard (/dashboard)**: The main overview page. Displays four KPI cards (Best Score, Avg Moves per Game, Fleet Survival, Win Rate) with delta indicators comparing the latest run to the previous run. Below the KPIs, the page shows an Opponent Intelligence section with stats (total modeled, exploitable count, avg trust, avg win rate), a classification distribution bar with tooltips showing which block belongs to which opponent class, and a run leaderboard. At the bottom is a Battle History table showing all runs with clickable rows that navigate to the analytics page. The table includes a "Download logs" action in the three-dot menu for each run, which downloads the raw JSONL battle log as a formatted text file. A floating AI chat bar is available for asking strategy and observability questions.
 
-**Battle Arena (/battle-arena)**: 
+**Battle Arena (/battle-arena)**:
 ![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/arena.webp)
 The live battle monitoring page. When a battle is started, this page connects to a Server-Sent Events (SSE) stream and displays the agent's decision-making process in real time. The left side shows an interactive workflow canvas with six agent nodes (Opponent Profiler, Defensive Ship Placement, Thompson Bandit Selector, Probability Targeting Engine, ReAct Decision Loop, Memory and Learning), each with three child nodes that light up as the corresponding events are received. The right side shows a scrolling log panel with timestamped, color-coded battle events. When the battle completes, a "Get Battle Analysis" button appears in the header.
 
-**Battle Analytics (/battle-analytics)**: 
+**Battle Analytics (/battle-analytics)**:
 
 ![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/analytics.webp)
 
@@ -643,6 +645,7 @@ python -m engine.play --mock
 ```
 
 Features:
+
 - Separate data directories for mock (`data/`) and prod (`data/prod/`) to prevent cross-contamination
 - Auto-retry on disqualification (up to 3 retries per round, disable with `--no-retry`)
 - Score tracking across attempts in `scores.jsonl` with timestamps, win/loss, and win rate
@@ -729,12 +732,12 @@ Stores the latest aggregated state per opponent (upserted after each run).
 
 Stores raw JSONL log content per battle, enabling the analytics route to serve battle data from Supabase when the log file is not available on the local filesystem or Render. The reporter uploads the log after each completed run. A backfill script (`scripts/backfill_logs_to_supabase.py`) is provided to upload existing local logs.
 
-| Column     | Type        | Description                                     |
-| ---------- | ----------- | ----------------------------------------------- |
-| id         | bigint      | Auto-incrementing primary key                   |
-| battle_id  | uuid        | Unique reference to battles table (unique)      |
-| raw_jsonl  | text        | Full JSONL log content                          |
-| created_at | timestamptz | Upload timestamp                                |
+| Column     | Type        | Description                                |
+| ---------- | ----------- | ------------------------------------------ |
+| id         | bigint      | Auto-incrementing primary key              |
+| battle_id  | uuid        | Unique reference to battles table (unique) |
+| raw_jsonl  | text        | Full JSONL log content                     |
+| created_at | timestamptz | Upload timestamp                           |
 
 ## Built With
 
@@ -1025,13 +1028,13 @@ The `@auth/agent-cli` tool persists credentials in `~/.agent-auth`. The agent ID
 | ------------------------------- | ---------------------------------- | ------------------------------------------------------------- |
 | Trust minimum                   | 0.15                               | Below this, no heatmap or memory priors are used              |
 | Trust exploit threshold         | 0.35                               | Exploit strategy becomes available                            |
-| Prediction accuracy for exploit | 0.80 (15+ games) / 0.90           | Minimum prediction accuracy to enable exploitation            |
+| Prediction accuracy for exploit | 0.80 (15+ games) / 0.90            | Minimum prediction accuracy to enable exploitation            |
 | Stability for exploit           | 0.65                               | Minimum placement stability to enable exploitation            |
 | Fixed placement min games       | 5                                  | Games needed to confirm fixed placement for exploitation      |
 | Minimum moves (optimal)         | 17                                 | Theoretical minimum: all ship cells, no misses                |
 | Maximum moves (ceiling)         | 80                                 | Upper bound for move efficiency normalization                 |
 | Max history per opponent        | 30                                 | Keep last 30 games of placement/firing data                   |
-| Heatmap weight formula          | trust \* 5.0 (8.0 if trust >= 0.7) | Scales heatmap influence by trust level                      |
+| Heatmap weight formula          | trust \* 5.0 (8.0 if trust >= 0.7) | Scales heatmap influence by trust level                       |
 | Placement blend                 | 0.7 observed + 0.3 prior           | Blend of observed frequency and occupancy prior for placement |
 | Bandit exploration minimum      | 3 games                            | Force uniform random sampling until each arm has 3 games      |
 | Composite reward weights        | 0.5 win + 0.3 moves + 0.2 survival | Multi-objective reward for bandit updates                     |
