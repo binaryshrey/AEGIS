@@ -100,11 +100,20 @@ class ReActAgent:
         move = self._next_move
         # Safety: if the pre-computed move was already played (e.g., state changed
         # between pre-computation and now), recompute immediately.
-        try:
-            if move in self.targeter._played():
+        played = self.targeter._played()
+        if move in played:
+            try:
                 move = self._compute()
-        except RuntimeError:
-            pass  # board truly exhausted — use whatever we have
+            except RuntimeError:
+                # Board exhausted — find ANY unplayed cell as absolute last resort
+                for r in range(self.targeter.size):
+                    for c in range(self.targeter.size):
+                        if (r, c) not in played:
+                            move = (r, c)
+                            break
+                    else:
+                        continue
+                    break
         reasoning.chosen_move = move
         reasoning.move_reason = self._last_reason
         return move

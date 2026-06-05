@@ -296,6 +296,7 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
                 break
 
             # Reset per-game state — re-initialised on next PLACE_SHIPS
+            client.reset_game_state()
             model         = None
             agent         = None
             obs           = None
@@ -538,11 +539,13 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
                 sunk_ship_size = _SHIP_SIZES.get(sunk_class)
 
             # Fallback for real-API GAME_COMPLETED (no 'state' key):
-            # infer outcome from the game result
+            # We can't infer the exact shot outcome without game state.
+            # Use last known state's yourShots if available, otherwise
+            # mark as "hit" (safe: doesn't falsely trigger sunk-ship logic).
             if not gs_now:
                 rt_now_fb = state.get("responseType")
                 if rt_now_fb in ("GAME_COMPLETED", "ATTEMPT_COMPLETED"):
-                    outcome = "sunk" if _get_outcome(state) == "AGENT_WIN" else "miss"
+                    outcome = "hit" if _get_outcome(state) == "AGENT_WIN" else "miss"
 
             # New incoming shots since last turn
             incoming    = gs_now.get("incomingShots", [])
@@ -595,6 +598,7 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
         wins=wins,
         losses=losses,
         games_detail=games_detail,
+        server_score=_server_score,
     ))
     return wins, losses, _server_score
 

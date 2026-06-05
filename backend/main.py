@@ -435,32 +435,85 @@ _LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 os.makedirs(_LOG_DIR, exist_ok=True)
 
 
+PROD_COMPETITION = "295cccc9137b5335cc581d67d655d6fa3b41dac6610dad0e7ed201625523ad8c"
+PROD_SERVER_URL = "https://intern-battleship-game-server.vercel.app"
+
+# Track active engine processes to prevent double-starts and enable cleanup
+_active_engines: dict[str, subprocess.Popen] = {}
+
+
 @app.post("/engine/start")
 async def engine_start(request: Request):
-    """Start the AEGIS engine as a subprocess."""
+    """Start the AEGIS engine as a subprocess.
+
+    If AGENT_AUTH_AGENT_ID and AGENT_AUTH_PRIVATE_KEY env vars are set,
+    runs in prod mode against the real competition server. Otherwise
+    falls back to mock mode against the local server.
+    """
     body = await request.json()
     battle_id = body.get("battleId")
     if not battle_id:
         return JSONResponse(status_code=400, content={"error": "battleId is required"})
 
+    # Prevent double-start: check if a process is already running for this battle
+    if battle_id in _active_engines:
+        existing = _active_engines[battle_id]
+        if existing.poll() is None:  # still running
+            return JSONResponse(status_code=409, content={
+                "error": "Engine already running for this battle",
+                "battleId": battle_id,
+                "pid": existing.pid,
+            })
+        else:
+            # Process finished — clean up
+            del _active_engines[battle_id]
+
+    # Clean up finished processes from tracking dict
+    finished = [bid for bid, p in _active_engines.items() if p.poll() is not None]
+    for bid in finished:
+        del _active_engines[bid]
+
     log_file = os.path.join(_LOG_DIR, f"{battle_id}.jsonl")
     engine_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    server_url = f"http://localhost:{os.environ.get('PORT', '5001')}"
+
+    # Determine mode: prod if auth env vars are set AND non-empty, else mock
+    agent_id = (os.environ.get("AGENT_AUTH_AGENT_ID") or "").strip()
+    private_key = (os.environ.get("AGENT_AUTH_PRIVATE_KEY") or "").strip()
+    is_prod = bool(agent_id and private_key)
+
+    if is_prod:
+        server_url = PROD_SERVER_URL
+        competition = PROD_COMPETITION
+        auth_mode = "prod"
+        data_dir = os.path.join(engine_dir, "data", "prod")
+    else:
+        server_url = f"http://localhost:{os.environ.get('PORT', '5001')}"
+        competition = COMPETITION_ID
+        auth_mode = "mock"
+        data_dir = os.path.join(engine_dir, "data")
+
+    os.makedirs(data_dir, exist_ok=True)
+    env = {**os.environ, "AEGIS_AUTH_MODE": auth_mode}
 
     proc = subprocess.Popen(
         [
             "python", "-m", "engine.main",
             "--url", server_url,
-            "--competition", COMPETITION_ID,
+            "--competition", competition,
             "--rounds", "1",
             "--battle-id", battle_id,
             "--log", log_file,
+            "--memory", os.path.join(data_dir, "memory.json"),
+            "--bandit", os.path.join(data_dir, "bandit.json"),
+            "--lessons", os.path.join(data_dir, "lessons.json"),
         ],
         cwd=engine_dir,
+        env=env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    return {"ok": True, "battleId": battle_id, "pid": proc.pid}
+    _active_engines[battle_id] = proc
+    return {"ok": True, "battleId": battle_id, "pid": proc.pid, "mode": auth_mode}
 
 
 @app.get("/engine/logs")
@@ -479,8 +532,32 @@ async def engine_logs(id: str):
         offset = 0
         wait_ticks = 0
         max_wait = 600  # ~5 min at 0.5s
+        stale_ticks = 0  # ticks with no new data after log file appeared
+        max_stale = 120  # ~60s of no new data → assume engine died
 
         while True:
+            # Check if the engine process is still alive
+            proc = _active_engines.get(id)
+            if proc is not None and proc.poll() is not None:
+                # Process exited — read any remaining log data then stop
+                if os.path.exists(log_file):
+                    stat = os.stat(log_file)
+                    if stat.st_size > offset:
+                        with open(log_file, "r") as f:
+                            f.seek(offset)
+                            chunk = f.read()
+                        for line in chunk.strip().split("\n"):
+                            if not line.strip():
+                                continue
+                            try:
+                                yield f"data: {json.dumps(json.loads(line))}\n\n"
+                            except json.JSONDecodeError:
+                                pass
+                # If no run_ended was emitted, send an error
+                yield f"data: {json.dumps({'event': 'error', 'data': {'message': 'Engine process exited'}})}\n\n"
+                del _active_engines[id]
+                return
+
             if not os.path.exists(log_file):
                 wait_ticks += 1
                 if wait_ticks > max_wait:
@@ -491,6 +568,7 @@ async def engine_logs(id: str):
 
             stat = os.stat(log_file)
             if stat.st_size > offset:
+                stale_ticks = 0
                 with open(log_file, "r") as f:
                     f.seek(offset)
                     chunk = f.read()
@@ -506,6 +584,11 @@ async def engine_logs(id: str):
                             return
                     except json.JSONDecodeError:
                         pass
+            else:
+                stale_ticks += 1
+                if stale_ticks > max_stale:
+                    yield f"data: {json.dumps({'event': 'error', 'data': {'message': 'Engine appears stalled — no output for 60s'}})}\n\n"
+                    return
 
             await asyncio.sleep(0.5)
 

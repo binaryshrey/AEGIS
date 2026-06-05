@@ -10,6 +10,7 @@ This mirrors StarSling's CI optimization loop:
 """
 import json
 import os
+import tempfile
 import time
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -102,14 +103,33 @@ class FeedbackStore:
         return lines
 
     def _save(self):
-        with open(self.path, "w") as f:
-            json.dump([l.to_dict() for l in self.lessons], f, indent=2)
+        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.path) or ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump([l.to_dict() for l in self.lessons], f, indent=2)
+            os.replace(tmp, self.path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
     def _load(self):
-        if os.path.exists(self.path):
+        if not os.path.exists(self.path):
+            return
+        try:
             with open(self.path) as f:
                 data = json.load(f)
             self.lessons = [Lesson.from_dict(d) for d in data]
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"  [warning] Corrupt lessons.json: {e} — starting fresh")
+            backup = self.path + ".corrupt"
+            try:
+                os.replace(self.path, backup)
+            except OSError:
+                pass
 
 
 class FeedbackEngine:

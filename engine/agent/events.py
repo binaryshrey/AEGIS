@@ -116,6 +116,7 @@ class AttemptEndedEvent:
     wins: int
     losses: int
     games_detail: list       # per-game summaries for this attempt
+    server_score: int | None = None  # finalScore from server (prod only)
 
 @dataclass
 class ErrorEvent:

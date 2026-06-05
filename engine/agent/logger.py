@@ -34,6 +34,7 @@ class GameLogger:
         self._attempt_scores: list[dict] = []
 
     def open(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self._fh = open(self.path, "a", buffering=1)  # line-buffered
         self._write("run_started", {
             "run_id": self._run_id,
@@ -61,13 +62,14 @@ class GameLogger:
         })
 
     def log_attempt_end(self, attempt_num: int, wins: int, losses: int,
-                        games: list[dict] = None):
+                        games: list[dict] = None, server_score: int | None = None):
         summary = {
             "attempt": attempt_num,
             "wins": wins,
             "losses": losses,
             "win_rate": wins / (wins + losses) if (wins + losses) else 0,
             "games_detail": games or [],
+            "server_score": server_score,
         }
         self._attempt_scores.append(summary)
         self._write("attempt_ended", summary)
@@ -93,7 +95,8 @@ class GameLogger:
         self.log_attempt_start(e.attempt_num)
 
     def on_attempt_ended(self, e: AttemptEndedEvent):
-        self.log_attempt_end(e.attempt_num, e.wins, e.losses, e.games_detail)
+        self.log_attempt_end(e.attempt_num, e.wins, e.losses, e.games_detail,
+                             getattr(e, 'server_score', None))
 
     def on_registered(self, e: RegisteredEvent):
         self._write("registered", {

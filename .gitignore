@@ -54,3 +54,10 @@ env/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# AEGIS runtime data (local-only, not source code)
+data/battles/
+data/prod/
+data/scores.jsonl
+data/agent_id.txt
+*.corrupt

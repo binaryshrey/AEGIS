@@ -61,6 +61,18 @@ def report_run(metrics: dict, attempt_num: int = 1, battle_id: str = None):
         print(f"  [reporter] Failed to report run: {e}")
 
 
+def _ensure_battle(sb, battle_id: str):
+    """Create a battles row if it doesn't exist (for CLI-initiated runs)."""
+    if not battle_id:
+        return
+    existing = sb.table("battles").select("battle_id").eq("battle_id", battle_id).execute()
+    if not existing.data:
+        sb.table("battles").insert({
+            "battle_id": battle_id,
+            "status": "complete",
+        }).execute()
+
+
 def _insert_run(sb, metrics: dict, attempt_num: int, battle_id: str = None):
     total_games = metrics.get("total_games", 0)
     if total_games == 0:
@@ -87,6 +99,9 @@ def _insert_run(sb, metrics: dict, attempt_num: int, battle_id: str = None):
 
     # Use server's actual score if available, otherwise estimate
     total_score = metrics.get("server_score") or _estimate_score(metrics)
+
+    # ── Ensure battle record exists (for CLI-initiated runs) ──────────────────
+    _ensure_battle(sb, battle_id)
 
     # ── Insert run ────────────────────────────────────────────────────────────
     run_row = {
@@ -164,7 +179,12 @@ def _estimate_score(metrics: dict) -> int:
     Real score comes from server; this gives a reasonable dashboard estimate.
     Score = sum per game of: hit_points + sink_bonuses + base_score(if won) - loss_penalties
     """
-    sink_bonus = {"CARRIER": 5, "BATTLESHIP": 4, "CRUISER": 3, "SUBMARINE": 3, "DESTROYER": 2}
+    # Real API sink bonuses (from /rules scoringConstants.sinkBonusByClass)
+    sink_bonus = {"CARRIER": 10, "BATTLESHIP": 8, "CRUISER": 7, "SUBMARINE": 6, "DESTROYER": 4}
+    # Real API class loss penalties (scoringConstants.classLossPenaltyByClass)
+    class_loss_penalty = {"CARRIER": 10, "BATTLESHIP": 8, "CRUISER": 7, "SUBMARINE": 6, "DESTROYER": 4}
+    per_ship_loss = 2  # scoringConstants.perShipLossPenalty
+    # 5 SCOUT (base 14) + 10 WARSHIP (base 15) = avg ~14.67
     base_score_per_win = 15  # approximate average
 
     score = 0
@@ -174,18 +194,18 @@ def _estimate_score(metrics: dict) -> int:
             won = i < m["wins"]
             ships_lost = m["ships_lost"][i] if i < len(m.get("ships_lost", [])) else 0
 
-            # Hits on opponent ships (17 total cells across 5 ships)
+            # Hits on opponent ships (17 total cells, +1 per hit)
             if won:
                 score += 17  # all hit points
-                score += sum(sink_bonus.values())  # all sink bonuses
+                score += sum(sink_bonus.values())  # all sink bonuses = 35
                 score += base_score_per_win
             else:
                 # Partial hits based on moves (rough estimate)
                 score += min(moves, 17)
 
-            # Loss penalties
-            score -= ships_lost * 2
-            # Approximate class loss penalty
-            score -= ships_lost * 3
+            # Loss penalties: perShipLossPenalty + classLossPenalty per ship lost
+            # Approximate: average class penalty = 7 per ship
+            score -= ships_lost * per_ship_loss
+            score -= ships_lost * 7  # avg class loss penalty
 
     return max(0, score)

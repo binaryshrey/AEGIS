@@ -15,8 +15,42 @@ Why Thompson Sampling over UCB:
 """
 import json
 import os
+import tempfile
 import numpy as np
 from dataclasses import dataclass, field, asdict
+
+
+def _atomic_json_write(path: str, data) -> None:
+    """Write JSON atomically: write to temp file, then rename."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _safe_json_load(path: str, default=None):
+    """Load JSON with fallback on corrupt/missing files."""
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"  [warning] Corrupt JSON in {path}: {e} — using default")
+        backup = path + ".corrupt"
+        try:
+            os.replace(path, backup)
+        except OSError:
+            pass
+        return default
 
 
 STRATEGIES = ["probability", "hunt", "exploit"]
@@ -217,13 +251,12 @@ class BanditStore:
         self._load()
 
     def _load(self):
-        if os.path.exists(self.path):
-            with open(self.path) as f:
-                self.bandit = ThompsonBandit.from_dict(json.load(f))
+        data = _safe_json_load(self.path, default={})
+        if data:
+            self.bandit = ThompsonBandit.from_dict(data)
 
     def save(self):
-        with open(self.path, "w") as f:
-            json.dump(self.bandit.to_dict(), f, indent=2)
+        _atomic_json_write(self.path, self.bandit.to_dict())
 
     def summary(self) -> list[str]:
         lines = []
