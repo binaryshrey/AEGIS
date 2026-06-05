@@ -370,12 +370,14 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
                 model.ship_placements = model.ship_placements[-1:]
                 trust = 0.0  # force untrusted after reset
 
-            # Exploit requires HIGH trust
+            # Exploit: fire at known positions. Threshold scales with data:
+            # more games → more confidence even with slightly lower accuracy.
+            _exploit_acc_min = 0.80 if model.games_played >= 15 else 0.90
             known_place = (
-                trust >= 0.4
-                and model.is_fixed_placement(min_games=8)
-                and stability > 0.75
-                and (pred_acc is not None and pred_acc > 0.90)
+                trust >= 0.35
+                and model.is_fixed_placement(min_games=5)
+                and stability > 0.65
+                and (pred_acc is not None and pred_acc > _exploit_acc_min)
             )
 
             available       = ["exploit", "hunt", "probability"] if known_place else ["hunt", "probability"]
@@ -417,7 +419,12 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
             #   trust 1.00 → weight 5.00
             if trust >= _TRUST_MIN and model.ship_placements:
                 heatmap = Heatmap.from_model(model, board_size=board_size)
-                heatmap_weight = trust * 5.0
+                # High trust → max heatmap weight. At trust>0.7 we're confident
+                # enough to go near-deterministic on the heatmap prior.
+                if trust >= 0.7:
+                    heatmap_weight = 8.0  # very aggressive — almost pure heatmap
+                else:
+                    heatmap_weight = trust * 5.0
                 targeter.apply_heatmap(heatmap, weight=heatmap_weight)
                 pa_str = f"pred_acc={pred_acc:.2f}" if pred_acc is not None else "pred_acc=N/A"
                 emitter.emit(EventType.PATTERN_DETECTED, PatternDetectedEvent(
@@ -454,14 +461,25 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
                 else:
                     combined = opening
 
-                # No zone penalty needed — the opening heatmap already captures
-                # the actual threat pattern (all 14 opponents scan top-to-bottom,
-                # rows 0-2 first, columns uniform). A generic "edge penalty"
-                # would penalize safe rows 8-9 and safe columns 0,1,8,9,
-                # reducing placement space for no benefit.
+                # Hard-avoid rows where opponent concentrates opening fire.
+                # If 60%+ of opening shots land in rows 0-2, those rows are
+                # death zones — no ship should be placed there regardless of
+                # candidate scoring. This converts soft penalty → hard constraint.
+                if len(model.firing_sequences) >= 3:
+                    top3_mass = float(opening[:3, :].sum())
+                    total_mass = float(opening.sum())
+                    if total_mass > 0 and top3_mass / total_mass > 0.55:
+                        for _r in range(3):
+                            for _c in range(board_size):
+                                avoid.add((_r, _c))
+                        # Also check row 3 — if 75%+ is in rows 0-3, avoid row 3 too
+                        top4_mass = float(opening[:4, :].sum())
+                        if top4_mass / total_mass > 0.70:
+                            for _c in range(board_size):
+                                avoid.add((3, _c))
 
                 shot_freq = obs_weight * combined + (1 - obs_weight) * uniform_noise
-                n_candidates = 300
+                n_candidates = 500
             else:
                 shot_freq = uniform_noise
                 n_candidates = 100
@@ -655,6 +673,13 @@ def _record_game(gs, model, memory, bandit_store, feedback, emitter,
         if s.get("outcome") == "SINK" and s.get("sunkShipClass")
     ]
 
+    # Loss margin: how many enemy ship cells we hadn't hit yet
+    our_hits_on_enemy = sum(
+        1 for s in gs.get("yourShots", [])
+        if s.get("outcome") in ("HIT", "SINK")
+    )
+    enemy_cells_remaining = 17 - our_hits_on_enemy  # 17 total ship cells
+
     emitter.emit(EventType.GAME_ENDED, GameEndedEvent(
         game_num=game_num,
         opponent_id=opponent_id,
@@ -666,6 +691,7 @@ def _record_game(gs, model, memory, bandit_store, feedback, emitter,
         hits_received=hits_received,
         sunk_classes=sunk_classes,
         lost_classes=lost_classes,
+        enemy_cells_remaining=enemy_cells_remaining,
     ))
 
     their_shots = [

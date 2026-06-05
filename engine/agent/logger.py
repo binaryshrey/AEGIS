@@ -160,6 +160,7 @@ class GameLogger:
             "improvement": improvement,
             "ships_lost": e.ships_lost,
             "hits_received": e.hits_received,
+            "enemy_cells_remaining": e.enemy_cells_remaining,
         })
 
     def on_memory_updated(self, e: MemoryUpdatedEvent):

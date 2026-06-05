@@ -219,31 +219,7 @@ class FeedbackEngine:
         # No strategy lessons generated — they accumulate contradictory
         # anecdotes that conflict with the bandit's evidence.
 
-        # Lesson 3: timing health / risk
-        if avg_ms < 50:
-            lessons.append(Lesson(
-                opponent_id=opponent_id,
-                lesson_type=LessonType.TIMING_OK.value,
-                summary=f"Decision loop healthy at {avg_ms:.1f}ms avg — well within timeout",
-                detail=f"All moves completed in {avg_ms:.1f}ms avg. No timeout risk.",
-                metric_before=None,
-                metric_after=avg_ms,
-                gain=None,
-                confidence=0.99,
-                games_basis=games_played,
-            ))
-        else:
-            lessons.append(Lesson(
-                opponent_id=opponent_id,
-                lesson_type=LessonType.TIMING_RISK.value,
-                summary=f"Slow moves: {avg_ms:.1f}ms avg — approaching timeout budget",
-                detail=f"Avg move latency {avg_ms:.1f}ms is elevated. Consider reducing pre-compute work.",
-                metric_before=None,
-                metric_after=avg_ms,
-                gain=None,
-                confidence=0.8,
-                games_basis=games_played,
-            ))
+        # Timing lessons removed — 70-126ms vs 10,000ms limit is pure noise.
 
         return lessons
 

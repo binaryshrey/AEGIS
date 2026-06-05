@@ -102,7 +102,7 @@ class Display:
             console.print(f"        [dim italic]  {' | '.join(parts)}[/]")
 
     def game_end(self, won: bool, moves: int, avg_ms: float, delta: int | None = None,
-                 ships_lost: int = 0, hits_received: int = 0):
+                 ships_lost: int = 0, hits_received: int = 0, enemy_cells_remaining: int = 0):
         status = "[green bold]WON [/]" if won else "[red bold]LOST[/]"
         delta_str = ""
         if delta is not None and delta != 0:
@@ -112,7 +112,12 @@ class Display:
         defense_str = ""
         if ships_lost > 0:
             defense_str = f"  |  [dim]lost {ships_lost} ships ({hits_received} hits)[/]"
-        console.print(f"  {status}  {moves} moves{delta_str}  |  [dim]{avg_ms:.0f}ms avg[/]{defense_str}")
+        margin_str = ""
+        if not won and enemy_cells_remaining > 0:
+            # Show how close the loss was: 1-2 cells = razor thin, 10+ = blowout
+            color = "yellow" if enemy_cells_remaining <= 3 else "red"
+            margin_str = f"  |  [{color}]margin: {enemy_cells_remaining} enemy cells left[/]"
+        console.print(f"  {status}  {moves} moves{delta_str}  |  [dim]{avg_ms:.0f}ms avg[/]{defense_str}{margin_str}")
 
     def lesson(self, msg: str):
         console.print(f"  [blue]LEARN[/] {msg}")

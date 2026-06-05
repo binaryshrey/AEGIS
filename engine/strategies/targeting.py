@@ -1,3 +1,4 @@
+import random
 import numpy as np
 from engine.strategies.heatmap import Heatmap
 
@@ -157,9 +158,13 @@ class Targeting:
             raise RuntimeError("Board exhausted")
 
         if self._use_enum_prob:
-            best = max(candidates, key=lambda c: self.prob[c[0]][c[1]])
+            # Find max probability, then randomly pick among tied cells
+            # to avoid systematic row-major scanning when prob map is flat
+            max_prob = max(self.prob[r][c] for r, c in candidates)
+            eps = max_prob * 0.01  # 1% tolerance for floating-point ties
+            tied = [c for c in candidates if self.prob[c[0]][c[1]] >= max_prob - eps]
+            best = random.choice(tied)
             prob_val = float(self.prob[best[0]][best[1]])
-            # Compute rank: how many candidates have higher or equal probability
             total_prob = sum(float(self.prob[r][c]) for r, c in candidates)
             return best, {
                 "mode": "hunt" if self.hits else "probability",

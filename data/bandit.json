@@ -39,10 +39,10 @@
     },
     "exploit": {
       "strategy": "exploit",
-      "wins": 150,
+      "wins": 160,
       "losses": 0,
-      "games": 15,
-      "total_moves": 255
+      "games": 16,
+      "total_moves": 272
     }
   },
   "scout-03": {
@@ -62,10 +62,10 @@
     },
     "exploit": {
       "strategy": "exploit",
-      "wins": 640,
+      "wins": 650,
       "losses": 0,
-      "games": 64,
-      "total_moves": 1088
+      "games": 65,
+      "total_moves": 1105
     }
   },
   "scout-04": {
@@ -85,10 +85,10 @@
     },
     "exploit": {
       "strategy": "exploit",
-      "wins": 670,
+      "wins": 680,
       "losses": 0,
-      "games": 67,
-      "total_moves": 1139
+      "games": 68,
+      "total_moves": 1156
     }
   },
   "scout-05": {
@@ -108,10 +108,10 @@
     },
     "exploit": {
       "strategy": "exploit",
-      "wins": 650,
+      "wins": 660,
       "losses": 0,
-      "games": 65,
-      "total_moves": 1105
+      "games": 66,
+      "total_moves": 1122
     }
   },
   "rotating-01": {
@@ -124,10 +124,10 @@
     },
     "hunt": {
       "strategy": "hunt",
-      "wins": 578,
-      "losses": 82,
-      "games": 66,
-      "total_moves": 2530
+      "wins": 587,
+      "losses": 83,
+      "games": 67,
+      "total_moves": 2560
     },
     "exploit": {
       "strategy": "exploit",
@@ -140,10 +140,10 @@
   "rotating-02": {
     "probability": {
       "strategy": "probability",
-      "wins": 544,
+      "wins": 554,
       "losses": 116,
-      "games": 66,
-      "total_moves": 3181
+      "games": 67,
+      "total_moves": 3200
     },
     "hunt": {
       "strategy": "hunt",
@@ -255,10 +255,10 @@
   "drift-02": {
     "probability": {
       "strategy": "probability",
-      "wins": 281,
-      "losses": 59,
-      "games": 34,
-      "total_moves": 1683
+      "wins": 289,
+      "losses": 61,
+      "games": 35,
+      "total_moves": 1736
     },
     "hunt": {
       "strategy": "hunt",
@@ -278,10 +278,10 @@
   "drift-03": {
     "probability": {
       "strategy": "probability",
-      "wins": 407,
-      "losses": 313,
-      "games": 72,
-      "total_moves": 5295
+      "wins": 414,
+      "losses": 316,
+      "games": 73,
+      "total_moves": 5361
     },
     "hunt": {
       "strategy": "hunt",
@@ -308,10 +308,10 @@
     },
     "hunt": {
       "strategy": "hunt",
-      "wins": 657,
-      "losses": 43,
-      "games": 70,
-      "total_moves": 1833
+      "wins": 666,
+      "losses": 44,
+      "games": 71,
+      "total_moves": 1863
     },
     "exploit": {
       "strategy": "exploit",
@@ -400,10 +400,10 @@
     },
     "hunt": {
       "strategy": "hunt",
-      "wins": 387,
-      "losses": 93,
-      "games": 48,
-      "total_moves": 2500
+      "wins": 395,
+      "losses": 95,
+      "games": 49,
+      "total_moves": 2553
     },
     "exploit": {
       "strategy": "exploit",
@@ -416,10 +416,10 @@
   "adaptive-03": {
     "probability": {
       "strategy": "probability",
-      "wins": 512,
-      "losses": 148,
-      "games": 66,
-      "total_moves": 3569
+      "wins": 520,
+      "losses": 150,
+      "games": 67,
+      "total_moves": 3635
     },
     "hunt": {
       "strategy": "hunt",
@@ -462,10 +462,10 @@
   "prob-02": {
     "probability": {
       "strategy": "probability",
-      "wins": 421,
-      "losses": 209,
-      "games": 63,
-      "total_moves": 2838
+      "wins": 429,
+      "losses": 211,
+      "games": 64,
+      "total_moves": 2880
     },
     "hunt": {
       "strategy": "hunt",
@@ -492,10 +492,10 @@
     },
     "hunt": {
       "strategy": "hunt",
-      "wins": 457,
-      "losses": 203,
-      "games": 66,
-      "total_moves": 2856
+      "wins": 458,
+      "losses": 212,
+      "games": 67,
+      "total_moves": 2919
     },
     "exploit": {
       "strategy": "exploit",
@@ -538,10 +538,10 @@
     },
     "hunt": {
       "strategy": "hunt",
-      "wins": 216,
-      "losses": 44,
-      "games": 26,
-      "total_moves": 1180
+      "wins": 225,
+      "losses": 45,
+      "games": 27,
+      "total_moves": 1212
     },
     "exploit": {
       "strategy": "exploit",
@@ -561,10 +561,10 @@
     },
     "hunt": {
       "strategy": "hunt",
-      "wins": 457,
-      "losses": 93,
-      "games": 55,
-      "total_moves": 2719
+      "wins": 466,
+      "losses": 94,
+      "games": 56,
+      "total_moves": 2758
     },
     "exploit": {
       "strategy": "exploit",

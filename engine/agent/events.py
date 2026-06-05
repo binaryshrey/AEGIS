@@ -88,6 +88,7 @@ class GameEndedEvent:
     hits_received: int = 0       # total hits on our fleet
     sunk_classes: list = field(default_factory=list)   # opponent ship classes we sunk
     lost_classes: list = field(default_factory=list)    # our ship classes lost
+    enemy_cells_remaining: int = 0   # opponent ship cells we hadn't hit yet (loss margin)
 
 @dataclass
 class MemoryUpdatedEvent:
@@ -196,7 +197,6 @@ def make_display_subscriber(display) -> dict[EventType, Callable]:
 _LESSON_TYPES = {
     "placement_exploit", "firing_dodge",
     "strategy_effective", "strategy_failed",
-    "timing_ok", "timing_risk",
 }
 _STRUCTURAL_TYPES = {"fixed_placement", "fixed_firing"}
 
@@ -211,8 +211,8 @@ def _display_pattern(display, e: PatternDetectedEvent):
         display.info(f"heatmap  {detail}")
     elif e.pattern_type in _STRUCTURAL_TYPES:
         display.pattern(e.detail)
-    elif e.pattern_type == "timing_ok":
-        pass  # fires every game — not actionable
+    elif e.pattern_type in ("timing_ok", "timing_risk"):
+        pass  # noise — 70ms vs 10,000ms limit
     elif e.pattern_type in _LESSON_TYPES:
         display.lesson(e.detail)
     else:
@@ -222,7 +222,8 @@ def _display_pattern(display, e: PatternDetectedEvent):
 def _display_game_end(display, e: GameEndedEvent):
     delta = (e.baseline_moves - e.total_moves) if e.baseline_moves is not None else None
     display.game_end(e.won, e.total_moves, e.avg_ms, delta,
-                     ships_lost=e.ships_lost, hits_received=e.hits_received)
+                     ships_lost=e.ships_lost, hits_received=e.hits_received,
+                     enemy_cells_remaining=e.enemy_cells_remaining)
 
 
 def make_metrics_subscriber() -> tuple[dict, dict[EventType, Callable]]:
