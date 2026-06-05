@@ -1,12 +1,10 @@
 # AEGIS: Adaptive Exploitation & Game Intelligence System ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white) ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) ![NumPy](https://img.shields.io/badge/NumPy-013243?logo=numpy&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 
-![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/banner.webp)
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/banner.png)
 
 AEGIS is an autonomous closed-loop battleship agent that detects opponent placement and firing patterns, exploits them through Thompson Sampling and Bayesian inference, and climbs the leaderboard faster with every game it plays. The system includes a full-featured real-time dashboard for monitoring battles, analyzing performance, and reviewing the agent's learning process across multiple runs. It also features an AI-powered chat assistant for strategy and observability questions, and a CLI for launching battles from the terminal.
 
 AEGIS was built for the StarSling Intern Competition, where autonomous agents compete in a series of Battleship games against a diverse roster of opponents. The agent does not receive any prior information about its opponents. Instead, it builds opponent models from scratch, classifies their behavior, computes a trust score for each model, and selects the optimal targeting strategy using a multi-armed bandit. Every decision the agent makes is logged, persisted, and available for real-time visualization in the dashboard.
-
-![Banner](aegis-app/public/banner.webp)
 
 ## Table of Contents
 
