@@ -37,9 +37,13 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Local dev: read JSONL file directly
+  // Local dev: read JSONL file directly (check both data/battles and data/prod/battles)
   const engineDir = path.resolve(process.cwd(), "..");
-  const logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
+  let logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
+  if (!fs.existsSync(logFile)) {
+    const prodFile = path.join(engineDir, "data", "prod", "battles", `${battleId}.jsonl`);
+    if (fs.existsSync(prodFile)) logFile = prodFile;
+  }
 
   const encoder = new TextEncoder();
   let cancelled = false;

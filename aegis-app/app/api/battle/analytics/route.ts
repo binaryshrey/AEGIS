@@ -285,7 +285,11 @@ export async function GET(req: NextRequest) {
 
   if (isLocal) {
     const engineDir = path.resolve(process.cwd(), "..");
-    const logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
+    let logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
+    if (!fs.existsSync(logFile)) {
+      // Also check data/prod/battles (production runs write here)
+      logFile = path.join(engineDir, "data", "prod", "battles", `${battleId}.jsonl`);
+    }
     if (!fs.existsSync(logFile)) {
       return NextResponse.json({ error: "Log file not found" }, { status: 404 });
     }

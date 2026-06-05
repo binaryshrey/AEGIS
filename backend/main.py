@@ -432,7 +432,17 @@ import subprocess
 import asyncio
 
 _LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "battles")
+_LOG_DIR_PROD = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "prod", "battles")
 os.makedirs(_LOG_DIR, exist_ok=True)
+
+
+def _find_log(battle_id: str) -> str | None:
+    """Find log file in data/battles or data/prod/battles."""
+    for d in (_LOG_DIR, _LOG_DIR_PROD):
+        p = os.path.join(d, f"{battle_id}.jsonl")
+        if os.path.exists(p):
+            return p
+    return None
 
 
 PROD_COMPETITION = "295cccc9137b5335cc581d67d655d6fa3b41dac6610dad0e7ed201625523ad8c"
@@ -523,7 +533,7 @@ async def engine_logs(id: str):
     if not re.match(r'^[a-f0-9-]+$', id, re.IGNORECASE):
         return JSONResponse(status_code=400, content={"error": "Invalid id"})
 
-    log_file = os.path.join(_LOG_DIR, f"{id}.jsonl")
+    log_file = _find_log(id) or os.path.join(_LOG_DIR, f"{id}.jsonl")
 
     from starlette.responses import StreamingResponse
     import json
@@ -605,8 +615,8 @@ async def engine_download(id: str):
     if not re.match(r'^[a-f0-9-]+$', id, re.IGNORECASE):
         return JSONResponse(status_code=400, content={"error": "Invalid id"})
 
-    log_file = os.path.join(_LOG_DIR, f"{id}.jsonl")
-    if not os.path.exists(log_file):
+    log_file = _find_log(id)
+    if not log_file:
         return JSONResponse(status_code=404, content={"error": "Log file not found"})
 
     with open(log_file, "r") as f:
@@ -633,8 +643,8 @@ async def engine_raw_log(id: str):
     if not re.match(r'^[a-f0-9-]+$', id, re.IGNORECASE):
         return JSONResponse(status_code=400, content={"error": "Invalid id"})
 
-    log_file = os.path.join(_LOG_DIR, f"{id}.jsonl")
-    if not os.path.exists(log_file):
+    log_file = _find_log(id)
+    if not log_file:
         return JSONResponse(status_code=404, content={"error": "Log file not found"})
 
     with open(log_file, "r") as f:

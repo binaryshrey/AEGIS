@@ -125,6 +125,7 @@ def _try_load_native_signer(agent_id: str) -> _NativeSigner | None:
         # Find private key (JWK format)
         key_data = (data.get("privateKey") or data.get("private_key")
                     or data.get("keyPair", {}).get("privateKey")
+                    or data.get("agentKeypair", {}).get("privateKey")
                     or data.get("keys", {}).get("privateKey"))
 
         if not key_data:
@@ -311,12 +312,23 @@ def connect(server: str = PROD_SERVER) -> str:
 
 def _parse_agent_id(output: str) -> str | None:
     """Extract agentId from CLI output."""
+    import re
     for line in output.splitlines():
         line = line.strip()
         for prefix in ("agentId:", "Agent ID:", "agent_id:", "id:"):
             if line.lower().startswith(prefix.lower()):
-                return line[len(prefix):].strip()
-        if len(line) > 8 and " " not in line and not line.startswith("{"):
+                val = line[len(prefix):].strip().strip('"')
+                if val:
+                    return val
+    # Fallback: look for a line that looks like a random ID
+    # (alphanumeric, 20+ chars, no common English words)
+    common_words = {"competitionid", "authorization", "configuration", "authentication"}
+    for line in output.splitlines():
+        line = line.strip().strip('"')
+        if (len(line) >= 20 and " " not in line
+                and not line.startswith("{")
+                and re.match(r'^[a-zA-Z0-9_-]+$', line)
+                and line.lower() not in common_words):
             return line
     return None
 

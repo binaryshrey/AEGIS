@@ -60,6 +60,7 @@ def find_private_key(agent_id=None):
             data.get("privateKey")
             or data.get("private_key")
             or data.get("keyPair", {}).get("privateKey")
+            or data.get("agentKeypair", {}).get("privateKey")
             or data.get("keys", {}).get("privateKey")
         )
 

@@ -147,6 +147,28 @@ class OpponentModel:
         return all(s[:min_len] == self.firing_sequences[0][:min_len]
                    for s in self.firing_sequences)
 
+    def firing_stability(self) -> float:
+        """
+        Measure how consistent firing patterns are (0.0 = random, 1.0 = identical).
+        Compares early-turn shot distributions across games.
+        Even non-deterministic bots may have stable hot zones.
+        """
+        if len(self.firing_sequences) < 2:
+            return 0.0
+        # Compare the first N shots of each game (early turns matter most)
+        window = min(15, min(len(s) for s in self.firing_sequences))
+        if window < 5:
+            return 0.0
+        similarities = []
+        for i in range(1, len(self.firing_sequences)):
+            prev_set = set(map(tuple, self.firing_sequences[i-1][:window]))
+            curr_set = set(map(tuple, self.firing_sequences[i][:window]))
+            if not prev_set or not curr_set:
+                continue
+            jaccard = len(prev_set & curr_set) / len(prev_set | curr_set)
+            similarities.append(jaccard)
+        return sum(similarities) / len(similarities) if similarities else 0.0
+
     def known_targets(self) -> list[tuple] | None:
         if not self.is_fixed_placement() or not self.ship_placements:
             return None
@@ -274,22 +296,26 @@ class OpponentModel:
                 key = tuple(shot)
                 # Turn 0 = weight 1.0; turn 1 = 0.5; turn 2 = 0.33 …
                 score[key] = score.get(key, 0.0) + 1.0 / (turn + 1)
-        # Threshold: equivalent to appearing at turn 0 in ≥50% of games.
-        # Using the same 0.5 factor as before keeps backward compatibility
-        # with the frequency-based tests while rewarding early-turn consistency.
-        threshold = max(0.1, len(self.firing_sequences) * 0.5)
+        # Threshold scales with data: with few games, be more aggressive
+        # about marking squares as dangerous (better safe than sorry).
+        #   1 game  → threshold 0.3 (any shot in first 3 turns counts)
+        #   2 games → threshold 0.5
+        #   5 games → threshold 1.5
+        #   10 games → threshold 3.0
+        n_games = len(self.firing_sequences)
+        threshold = max(0.1, n_games * 0.3) if n_games <= 2 else n_games * 0.5
         return {sq for sq, s in score.items() if s >= threshold}
 
     def shot_frequency_map(self, board_size: int = 10) -> np.ndarray | None:
         """
         Build a 10x10 frequency grid from observed opponent firing sequences.
 
-        Returns None if fewer than 3 games observed (not enough data).
+        Returns None if no games observed.
         Each shot at turn t contributes weight 1/(t+1) — early shots are
         weighted more heavily because early hits hurt us more.
         The result is normalized to [0, 1] range.
         """
-        if len(self.firing_sequences) < 3:
+        if len(self.firing_sequences) < 1:
             return None
         grid = np.zeros((board_size, board_size), dtype=np.float64)
         for seq in self.firing_sequences:
@@ -301,6 +327,71 @@ class OpponentModel:
         if max_val > 0:
             grid /= max_val
         return grid
+
+    def opening_heatmap(self, board_size: int = 10, window: int = 12) -> np.ndarray | None:
+        """
+        Heatmap of ONLY the first `window` shots per game.
+
+        Captures the opponent's opening strategy — where they search
+        first, before hits change their behavior. This is the most
+        predictable and exploitable part of any opponent's firing pattern.
+
+        Returns None if no firing data. Normalized to [0, 1].
+        """
+        if len(self.firing_sequences) < 1:
+            return None
+        grid = np.zeros((board_size, board_size), dtype=np.float64)
+        for seq in self.firing_sequences:
+            for shot in seq[:window]:
+                r, c = int(shot[0]), int(shot[1])
+                if 0 <= r < board_size and 0 <= c < board_size:
+                    grid[r, c] += 1.0
+        max_val = grid.max()
+        if max_val > 0:
+            grid /= max_val
+        return grid
+
+    def fire_archetype(self) -> str:
+        """
+        Classify opponent's firing strategy from opening shot patterns.
+
+        Returns: 'fixed_fire', 'edge_hunter', 'center_hunter',
+                 'adaptive', or 'unknown'.
+        """
+        if len(self.firing_sequences) < 2:
+            return "unknown"
+
+        if self.is_fixed_firing():
+            return "fixed_fire"
+
+        # Analyze first 12 shots for edge/center bias
+        edge_count = 0
+        total = 0
+        for seq in self.firing_sequences:
+            for shot in seq[:12]:
+                r, c = int(shot[0]), int(shot[1])
+                if r in (0, 1, 8, 9) or c in (0, 1, 8, 9):
+                    edge_count += 1
+                total += 1
+
+        if total == 0:
+            return "unknown"
+
+        edge_ratio = edge_count / total
+
+        # Check opening consistency
+        first_shots = [tuple(s[0]) for s in self.firing_sequences if s]
+        unique_starts = len(set(first_shots))
+        n_games = len(self.firing_sequences)
+
+        if edge_ratio >= 0.80:
+            return "edge_hunter"
+        elif edge_ratio <= 0.30:
+            return "center_hunter"
+        elif unique_starts >= n_games * 0.3:
+            return "adaptive"
+        else:
+            return "edge_hunter" if edge_ratio > 0.5 else "adaptive"
 
     def to_dict(self) -> dict:
         return {

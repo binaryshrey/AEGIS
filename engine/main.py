@@ -41,43 +41,24 @@ _SHIP_SIZES = {"CARRIER": 5, "BATTLESHIP": 4, "CRUISER": 3, "SUBMARINE": 3, "DES
 import numpy as np
 
 # Cached anti-occupancy prior (computed once per board_size + ship config)
-_occupancy_cache: dict[tuple, "np.ndarray"] = {}
-
-
 def _anti_occupancy_prior(board_size: int, ship_classes: list[tuple],
                           noisy: bool = True) -> "np.ndarray":
     """
-    Occupancy density for a flat board — counts how many legal ship placements
-    cover each cell. Center cells score highest, edges/corners lowest.
+    Uniform noise prior with no systematic bias.
 
-    When *noisy* (default), each call multiplies by uniform(0.8, 1.2) per cell
-    so placement isn't deterministic across games.
+    Earlier versions computed occupancy density (center = high, edges = low)
+    and placed ships in LOW-density cells — pushing ships to edges/corners.
+    This was catastrophically exploitable: smart opponents sweep edges first.
 
-    Used as defensive placement scoring: ships placed in LOW-density cells
-    are found last by probability-based opponents.
+    Now returns a flat grid with per-cell noise so candidate scoring still
+    differentiates placements (via opponent-specific firing data or spread bonus)
+    without introducing any systematic positional bias.
     """
-    cache_key = (board_size, tuple((c, s) for c, s in ship_classes))
-    if cache_key not in _occupancy_cache:
-        grid = np.zeros((board_size, board_size), dtype=np.float64)
-        for _, size in ship_classes:
-            for row in range(board_size):
-                for col in range(board_size):
-                    if col + size <= board_size:
-                        for i in range(size):
-                            grid[row, col + i] += 1
-                    if row + size <= board_size:
-                        for i in range(size):
-                            grid[row + i, col] += 1
-        max_val = grid.max()
-        if max_val > 0:
-            grid /= max_val
-        _occupancy_cache[cache_key] = grid
-
-    base = _occupancy_cache[cache_key]
+    base = np.ones((board_size, board_size), dtype=np.float64)
     if noisy:
         noise = np.random.uniform(0.8, 1.2, size=base.shape)
         return base * noise
-    return base.copy()
+    return base
 
 
 def _get_outcome(resp: dict) -> str | None:
@@ -349,19 +330,26 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
             # ── Trust score: continuous measure of how much to trust learned priors
             # prediction_accuracy() returns overlap (0=bad, 1=perfect prediction)
             stability   = model.placement_stability()
+            fire_stab   = model.firing_stability()
             pred_acc    = model.prediction_accuracy()  # None if < 2 placements
-            sample_conf = min(model.games_played / 10.0, 1.0)  # 0→1 over 10 games
+            # Faster ramp: 0→1 over 5 games (was 10).
+            # With 15 games per attempt, need useful trust by game 3-4.
+            sample_conf = min(model.games_played / 5.0, 1.0)
 
             # Prediction accuracy proxy:
             # - If we have actual prediction data, use it directly.
             # - If stability is very high (> 0.9) with 2+ games, placements
             #   are nearly identical → predictions WOULD be accurate. Use
             #   stability as proxy so scouts aren't blocked for 3 games.
+            # - If firing is very stable, that's also a trust signal — the
+            #   opponent is predictable even if we can't see their placements.
             # - Otherwise: no evidence = no trust.
             if pred_acc is not None:
                 pa = pred_acc
             elif stability > 0.9 and model.games_played >= 2:
                 pa = stability  # near-identical placements → trust early
+            elif fire_stab > 0.5 and model.games_played >= 2:
+                pa = fire_stab * 0.7  # firing pattern is stable → partial trust
             else:
                 pa = 0.0
 
@@ -396,10 +384,12 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
             pa_disp = f"{pred_acc:.2f}" if pred_acc is not None else f"~{pa:.2f}"
             n_place = len(model.ship_placements)
             n_valid = sum(1 for p in model.ship_placements if len(p) >= 9)
+            fire_arch_disp = model.fire_archetype()
             strategy_reason = (
                 f"bandit (trust={trust:.2f} {opp_type}"
-                f" | stab={stability:.2f} pa={pa_disp} games={model.games_played}"
-                f" place={n_valid}/{n_place})"
+                f" | stab={stability:.2f} fire_stab={fire_stab:.2f} pa={pa_disp}"
+                f" fire={fire_arch_disp}"
+                f" games={model.games_played} place={n_valid}/{n_place})"
             )
 
             emitter.emit(EventType.GAME_STARTED, GameStartedEvent(
@@ -443,24 +433,43 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
                     targeter.inject_known_targets(known)
 
             # Defensive placement:
-            #   High trust  → 0.7 * observed shot_frequency + 0.3 * occupancy prior
-            #   Low trust   → noisy occupancy prior only
-            # Both paths bias ships toward low-density / low-frequency cells.
-            occupancy = _anti_occupancy_prior(board_size, ship_classes)
-            if trust >= _TRUST_MIN:
-                avoid     = model.dangerous_squares()
-                observed  = model.shot_frequency_map(board_size)
-                if observed is not None:
-                    shot_freq = 0.7 * observed + 0.3 * occupancy
+            #   Firing data is ALWAYS used if available — decoupled from trust.
+            #   Trust gates offensive heatmaps (predicting ship placement),
+            #   but defensive avoidance (where they shoot) is a different signal.
+            #   Even 1 game of firing data is better than nothing.
+            # Defensive placement: use OPENING heatmap (first 12 shots per game)
+            # as primary signal. Opening shots are the most predictable and
+            # determine whether we survive long enough for targeting to matter.
+            uniform_noise = _anti_occupancy_prior(board_size, ship_classes)
+            avoid         = model.dangerous_squares()
+            opening       = model.opening_heatmap(board_size)
+            full_freq     = model.shot_frequency_map(board_size)
+            fire_arch     = model.fire_archetype()
+
+            if opening is not None:
+                # Opening heatmap is the primary defensive signal.
+                obs_weight = min(0.9, 0.6 + 0.04 * len(model.firing_sequences))
+                if full_freq is not None:
+                    combined = 0.7 * opening + 0.3 * full_freq
                 else:
-                    shot_freq = occupancy
+                    combined = opening
+
+                # No zone penalty needed — the opening heatmap already captures
+                # the actual threat pattern (all 14 opponents scan top-to-bottom,
+                # rows 0-2 first, columns uniform). A generic "edge penalty"
+                # would penalize safe rows 8-9 and safe columns 0,1,8,9,
+                # reducing placement space for no benefit.
+
+                shot_freq = obs_weight * combined + (1 - obs_weight) * uniform_noise
+                n_candidates = 300
             else:
-                avoid     = set()
-                shot_freq = occupancy
+                shot_freq = uniform_noise
+                n_candidates = 100
             placer     = Placement(board_size, ship_classes,
                                    allow_adjacency=allow_adjacency)
             try:
-                placements = placer.place(avoid=avoid, shot_frequency=shot_freq)
+                placements = placer.place(avoid=avoid, shot_frequency=shot_freq,
+                                          num_candidates=n_candidates)
             except Exception as e:
                 emitter.emit(EventType.ERROR, ErrorEvent(
                     context=f"attempt {attempt_num} game {game_num} placer",
@@ -468,6 +477,24 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
                     recoverable=False,
                 ))
                 break
+
+            # Log placement row distribution for diagnostics
+            _ship_sizes = dict(ship_classes)
+            _placed_rows = []
+            for p in placements:
+                sz = _ship_sizes[p["shipClass"]]
+                cells = [(p["startRow"] + i, p["startCol"]) if p["orientation"] == "VERTICAL"
+                         else (p["startRow"], p["startCol"] + i) for i in range(sz)]
+                _placed_rows.extend(r for r, c in cells)
+            _row_min, _row_max = min(_placed_rows), max(_placed_rows)
+            _top3 = sum(1 for r in _placed_rows if r <= 2)
+            _bot5 = sum(1 for r in _placed_rows if r >= 5)
+            emitter.emit(EventType.PATTERN_DETECTED, PatternDetectedEvent(
+                opponent_id=opponent_id,
+                pattern_type="placement_zone",
+                games_confirmed=len(model.firing_sequences),
+                detail=f"rows {_row_min}-{_row_max} | top3={_top3}/{len(_placed_rows)} bot5={_bot5}/{len(_placed_rows)} fire={fire_arch}",
+            ))
 
             try:
                 state = client.place_ships(placements, http_timeout=http_budget)

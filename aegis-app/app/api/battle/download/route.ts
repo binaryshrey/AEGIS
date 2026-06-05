@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Local dev: read file directly
-  const logPath = path.resolve(process.cwd(), `../data/battles/${battleId}.jsonl`);
+  // Local dev: read file directly (check both data/battles and data/prod/battles)
+  let logPath = path.resolve(process.cwd(), `../data/battles/${battleId}.jsonl`);
+  if (!fs.existsSync(logPath)) {
+    logPath = path.resolve(process.cwd(), `../data/prod/battles/${battleId}.jsonl`);
+  }
 
   if (!fs.existsSync(logPath)) {
     return NextResponse.json({ error: "Log file not found" }, { status: 404 });
