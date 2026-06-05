@@ -265,6 +265,11 @@ class Client:
                 timeout=_DEFAULT_TIMEOUT,
             )
             r.raise_for_status()
-            return r.json()
+            data = r.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("entries", data.get("leaderboard", []))
+            return []
         except Exception:
             return []

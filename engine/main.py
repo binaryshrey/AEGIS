@@ -575,7 +575,19 @@ def play_attempt(client, memory, emitter, feedback, bandit_store,
             if gs_now:
                 last_gs = gs_now  # keep latest state for GAME_COMPLETED fallback
             your_shots = gs_now.get("yourShots", [])
-            last_shot  = your_shots[-1] if your_shots else {}
+            # Look up OUR shot by coordinate — competition server may not
+            # return yourShots in chronological order, so [-1] is unreliable.
+            last_shot  = {}
+            for _s in your_shots:
+                try:
+                    if int(_s.get("row", -1)) == row and int(_s.get("col", -1)) == col:
+                        last_shot = _s
+                        break
+                except (ValueError, TypeError):
+                    continue
+            # Fallback: index by pre-shot count (works if chronological)
+            if not last_shot and len(your_shots) > shot_count:
+                last_shot = your_shots[shot_count]
             outcome    = _OUTCOME.get(last_shot.get("outcome", "MISS"), "miss")
             sunk_ship_size = None
             sunk_class = None
@@ -870,9 +882,12 @@ def main():
 
     display.summary(total_wins, total_games)
 
-    board = client.leaderboard()
-    if board:
-        display.leaderboard(board, args.competition)
+    try:
+        board = client.leaderboard()
+        if board:
+            display.leaderboard(board, args.competition)
+    except Exception:
+        pass  # don't let leaderboard crash the run
 
     print_metrics_summary(metrics)
 

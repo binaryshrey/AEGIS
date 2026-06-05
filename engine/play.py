@@ -140,7 +140,7 @@ def _run_with_retry(server: str, competition: str, auth_mode: str,
             if last_line:
                 try:
                     event = json.loads(last_line)
-                    if event.get("event") == "run_ended":
+                    if event.get("event") in ("run_ended", "attempt_ended"):
                         return _extract_results(log_path)
                 except Exception:
                     pass

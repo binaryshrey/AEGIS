@@ -328,13 +328,13 @@
     "opponent_id": "scout-01",
     "lesson_type": "placement_exploit",
     "summary": "Fixed placement confirmed \u2014 exploit drops moves to ~17",
-    "detail": "After 71 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
+    "detail": "After 72 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
     "metric_before": 17.0,
     "metric_after": 17.0,
     "gain": 0,
     "confidence": 0.95,
-    "games_basis": 71,
-    "timestamp": 1780625865.876134,
+    "games_basis": 72,
+    "timestamp": 1780629660.8457441,
     "applied_count": 0
   },
   {
@@ -346,38 +346,12 @@
     "metric_after": 2.0,
     "gain": null,
     "confidence": 0.9,
-    "games_basis": 71,
-    "timestamp": 1780625865.876256,
+    "games_basis": 72,
+    "timestamp": 1780629660.845885,
     "applied_count": 0
   },
   {
     "opponent_id": "scout-02",
-    "lesson_type": "placement_exploit",
-    "summary": "Fixed placement confirmed \u2014 exploit drops moves to ~17",
-    "detail": "After 74 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
-    "metric_before": 17.0,
-    "metric_after": 17.0,
-    "gain": 0,
-    "confidence": 0.95,
-    "games_basis": 74,
-    "timestamp": 1780624676.1008809,
-    "applied_count": 0
-  },
-  {
-    "opponent_id": "scout-02",
-    "lesson_type": "firing_dodge",
-    "summary": "Firing pattern locked \u2014 avoid 2 hot squares on placement",
-    "detail": "Bot fires in a deterministic sequence. 2 squares appear in \u226560% of early turns. Adaptive placement now avoids these to survive longer.",
-    "metric_before": null,
-    "metric_after": 2.0,
-    "gain": null,
-    "confidence": 0.9,
-    "games_basis": 74,
-    "timestamp": 1780624676.101092,
-    "applied_count": 0
-  },
-  {
-    "opponent_id": "scout-03",
     "lesson_type": "placement_exploit",
     "summary": "Fixed placement confirmed \u2014 exploit drops moves to ~17",
     "detail": "After 75 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
@@ -386,7 +360,33 @@
     "gain": 0,
     "confidence": 0.95,
     "games_basis": 75,
-    "timestamp": 1780625864.334668,
+    "timestamp": 1780629664.1198971,
+    "applied_count": 0
+  },
+  {
+    "opponent_id": "scout-02",
+    "lesson_type": "firing_dodge",
+    "summary": "Firing pattern locked \u2014 avoid 2 hot squares on placement",
+    "detail": "Bot fires in a deterministic sequence. 2 squares appear in \u226560% of early turns. Adaptive placement now avoids these to survive longer.",
+    "metric_before": null,
+    "metric_after": 2.0,
+    "gain": null,
+    "confidence": 0.9,
+    "games_basis": 75,
+    "timestamp": 1780629664.120023,
+    "applied_count": 0
+  },
+  {
+    "opponent_id": "scout-03",
+    "lesson_type": "placement_exploit",
+    "summary": "Fixed placement confirmed \u2014 exploit drops moves to ~17",
+    "detail": "After 76 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
+    "metric_before": 17.0,
+    "metric_after": 17.0,
+    "gain": 0,
+    "confidence": 0.95,
+    "games_basis": 76,
+    "timestamp": 1780629657.369205,
     "applied_count": 0
   },
   {
@@ -398,8 +398,8 @@
     "metric_after": 2.0,
     "gain": null,
     "confidence": 0.9,
-    "games_basis": 75,
-    "timestamp": 1780625864.334827,
+    "games_basis": 76,
+    "timestamp": 1780629657.369331,
     "applied_count": 0
   },
   {
@@ -432,13 +432,13 @@
     "opponent_id": "scout-05",
     "lesson_type": "placement_exploit",
     "summary": "Fixed placement confirmed \u2014 exploit drops moves to ~17",
-    "detail": "After 78 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
+    "detail": "After 79 games (win rate 100%), bot always places ships identically. Injecting known targets reduced game to 17 moves (vs baseline 17).",
     "metric_before": 17.0,
     "metric_after": 17.0,
     "gain": 0,
     "confidence": 0.95,
-    "games_basis": 78,
-    "timestamp": 1780624681.160664,
+    "games_basis": 79,
+    "timestamp": 1780629683.196897,
     "applied_count": 0
   },
   {
@@ -450,8 +450,8 @@
     "metric_after": 2.0,
     "gain": null,
     "confidence": 0.9,
-    "games_basis": 78,
-    "timestamp": 1780624681.1608162,
+    "games_basis": 79,
+    "timestamp": 1780629683.1970298,
     "applied_count": 0
   },
   {
