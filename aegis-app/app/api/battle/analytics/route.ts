@@ -281,25 +281,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid or missing id" }, { status: 400 });
   }
 
-  let logContent: string;
+  let logContent: string | null = null;
 
   if (isLocal) {
     const engineDir = path.resolve(process.cwd(), "..");
     let logFile = path.join(engineDir, "data", "battles", `${battleId}.jsonl`);
     if (!fs.existsSync(logFile)) {
-      // Also check data/prod/battles (production runs write here)
       logFile = path.join(engineDir, "data", "prod", "battles", `${battleId}.jsonl`);
     }
-    if (!fs.existsSync(logFile)) {
-      return NextResponse.json({ error: "Log file not found" }, { status: 404 });
+    if (fs.existsSync(logFile)) {
+      logContent = fs.readFileSync(logFile, "utf-8");
     }
-    logContent = fs.readFileSync(logFile, "utf-8");
   } else {
-    const res = await fetch(`${ENGINE_SERVER_URL}/engine/raw-log?id=${battleId}`);
-    if (!res.ok) {
-      return NextResponse.json({ error: "Log file not found" }, { status: 404 });
+    try {
+      const res = await fetch(`${ENGINE_SERVER_URL}/engine/raw-log?id=${battleId}`);
+      if (res.ok) {
+        logContent = await res.text();
+      }
+    } catch {
+      // Render backend unreachable — fall through to Supabase
     }
-    logContent = await res.text();
+  }
+
+  // Fallback: read raw log from Supabase if filesystem/Render didn't have it
+  if (!logContent) {
+    const { data: logRow } = await supabase
+      .from("battle_logs")
+      .select("raw_jsonl")
+      .eq("battle_id", battleId)
+      .single();
+    if (logRow?.raw_jsonl) {
+      logContent = logRow.raw_jsonl;
+    }
+  }
+
+  if (!logContent) {
+    return NextResponse.json({ error: "Log file not found" }, { status: 404 });
   }
 
   // Parse current + fetch Supabase data in parallel

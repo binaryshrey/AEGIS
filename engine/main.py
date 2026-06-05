@@ -878,7 +878,9 @@ def main():
 
     # Report to Supabase dashboard (silently skipped if env vars not set)
     from engine.agent.reporter import report_run
-    report_run(metrics, attempt_num=args.rounds, battle_id=getattr(args, 'battle_id', None))
+    report_run(metrics, attempt_num=args.rounds,
+               battle_id=getattr(args, 'battle_id', None),
+               log_file=args.log)
 
     logger.close()
     print(f"  Log written to: {args.log}")

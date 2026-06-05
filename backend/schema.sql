@@ -66,6 +66,14 @@ create table if not exists opponents (
   updated_at      timestamptz default now()
 );
 
+-- ── Battle logs: raw JSONL stored for analytics when filesystem unavailable ─
+create table if not exists battle_logs (
+  id            bigint generated always as identity primary key,
+  battle_id     uuid unique not null references battles(battle_id) on delete cascade,
+  raw_jsonl     text not null,
+  created_at    timestamptz default now()
+);
+
 -- ── Indexes for dashboard queries ────────────────────────────────────────────
 create index if not exists idx_battles_uuid on battles(battle_id);
 create index if not exists idx_runs_battle on runs(battle_id);

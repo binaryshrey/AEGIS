@@ -42,13 +42,16 @@ def _get_client():
         return None
 
 
-def report_run(metrics: dict, attempt_num: int = 1, battle_id: str = None):
+def report_run(metrics: dict, attempt_num: int = 1, battle_id: str = None,
+               log_file: str = None):
     """
     Push a completed run's metrics to Supabase.
     Inserts into `runs` and `games` tables, upserts `opponents`.
+    Optionally uploads raw JSONL log for remote analytics access.
 
     metrics: the dict from make_metrics_subscriber()
     battle_id: optional UUID linking this run to a battle session
+    log_file: path to the JSONL log file to upload
     """
     sb = _get_client()
     if sb is None:
@@ -59,6 +62,12 @@ def report_run(metrics: dict, attempt_num: int = 1, battle_id: str = None):
         _insert_run(sb, metrics, attempt_num, battle_id)
     except Exception as e:
         print(f"  [reporter] Failed to report run: {e}")
+
+    if log_file and battle_id:
+        try:
+            _upload_log(sb, battle_id, log_file)
+        except Exception as e:
+            print(f"  [reporter] Failed to upload log: {e}")
 
 
 def _ensure_battle(sb, battle_id: str):
@@ -171,6 +180,21 @@ def _insert_run(sb, metrics: dict, attempt_num: int, battle_id: str = None):
         }, on_conflict="opponent_id").execute()
 
     print(f"  [reporter] Run #{run_id} reported to Supabase ({len(game_rows)} games)")
+
+
+def _upload_log(sb, battle_id: str, log_file: str):
+    """Upload raw JSONL log to Supabase for remote analytics access."""
+    log_path = Path(log_file)
+    if not log_path.exists():
+        return
+    raw = log_path.read_text()
+    if not raw.strip():
+        return
+    sb.table("battle_logs").upsert({
+        "battle_id": battle_id,
+        "raw_jsonl": raw,
+    }, on_conflict="battle_id").execute()
+    print(f"  [reporter] Log uploaded to Supabase ({len(raw)} bytes)")
 
 
 def _estimate_score(metrics: dict) -> int:
