@@ -107,6 +107,8 @@ Several refinements make this strategy more effective:
 
 **Heatmap blending** multiplies the probability counts element-wise with historical ship frequency data from the heatmap. If the opponent tends to place ships in certain regions, those regions receive higher probability even before any shots are fired.
 
+**Random tie-breaking** prevents systematic row-major scanning when the probability map is flat. After a hit-and-sink cycle clears active hits, many cells can have identical probabilities. Without tie-breaking, `max()` would always pick the first cell in row-major order (0,0), then (0,1), and so on, wasting 30 to 40 shots scanning from the top-left. The strategy collects all cells within 1% of the maximum probability and selects one at random, ensuring shots are spread across the board.
+
 The computational complexity is O(n squared times k) where n is the board size (10) and k is the number of remaining ships. This runs in sub-millisecond time, well within the per-turn timeout budget.
 
 ### Hunt and Target Strategy
@@ -127,10 +129,12 @@ The exploit strategy is the most aggressive and is only available when the agent
 
 **Activation criteria** (all must be true):
 
-- Trust score is at least 0.4
-- The opponent has been confirmed as having fixed placement with a minimum of 8 games
-- Placement stability is above 0.75
-- Prediction accuracy is above 0.90
+- Trust score is at least 0.35
+- The opponent has been confirmed as having fixed placement with a minimum of 5 games
+- Placement stability is above 0.65
+- Prediction accuracy is above 0.80 (for opponents with 15+ games; 0.90 otherwise)
+
+These thresholds were tuned aggressively to unlock exploitation earlier in the competition. With 15 opponents and limited attempts, waiting for 8+ games at 0.90 accuracy meant the agent would never exploit some fixed-placement bots in time. The lowered thresholds accept slightly more risk of a miss in exchange for much earlier exploitation.
 
 When these criteria are met, the exploit strategy injects all predicted ship cells as priority targets. In the best case, this allows the agent to sink all ships in exactly 17 moves with zero misses.
 
@@ -209,8 +213,8 @@ The trust score gates access to increasingly aggressive capabilities:
 | Trust Level | Range          | Capabilities                                                                                                                                               |
 | ----------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Untrusted   | Below 0.15     | No heatmap blending, no exploit, no memory priors. The agent plays as if it has never seen this opponent.                                                  |
-| Low trust   | 0.15 to 0.40   | Weak heatmap boost applied (weight = trust \* 5, so 0.2 trust yields 1.0x heatmap weight). Dangerous square avoidance enabled for placement. No exploit.   |
-| Trusted     | 0.40 and above | Full heatmap blending. Exploit strategy becomes available if other criteria (stability above 0.75, prediction accuracy above 0.90, 8+ games) are also met. |
+| Low trust   | 0.15 to 0.35   | Weak heatmap boost applied (weight = trust \* 5, so 0.2 trust yields 1.0x heatmap weight). Dangerous square avoidance and top-row hard-avoid enabled for placement. No exploit.   |
+| Trusted     | 0.35 and above | Full heatmap blending (8.0x boost at trust >= 0.7). Exploit strategy becomes available if other criteria (stability above 0.65, prediction accuracy above 0.80, 5+ games) are also met. |
 
 ### Model Reset
 
@@ -246,11 +250,15 @@ The agent classifies each opponent into one of several behavioral categories. Cl
 
 Defensive ship placement determines where the agent's own ships go at the start of each game. The goal is to place ships where the opponent is least likely to fire, especially in the early turns of the game.
 
+### Top-Row Hard Avoidance
+
+Before generating candidate placements, the agent analyzes the opponent's opening shot heatmap. If the opponent concentrates more than 55% of early-turn fire in the top 3 rows (rows 0 to 2), those 30 cells are added to the hard-avoid set. If more than 70% falls in the top 4 rows, row 3 is also avoided. This is a blanket defense against top-scanning opponents, which are common in the competition roster. The avoidance is computed from at least 3 observed firing sequences to avoid reacting to noise.
+
 ### Three-Phase Placement
 
 Placement uses a multi-phase approach with progressive constraint relaxation:
 
-**Phase 1: Full constraints.** The placer respects the dangerous squares avoidance set (cells where the opponent frequently fires in early turns), maintains a 1-cell buffer between ships, and requires all cells to be on the board. Up to 500 random attempts are made. If a valid placement is found, it is used.
+**Phase 1: Full constraints.** The placer respects the dangerous squares avoidance set (cells where the opponent frequently fires in early turns) plus the top-row hard-avoid set, maintains a 1-cell buffer between ships, and requires all cells to be on the board. Up to 500 random attempts are made. If a valid placement is found, it is used.
 
 **Phase 2: Relax buffer.** If Phase 1 fails (the board is too constrained), the buffer requirement is dropped and ships are allowed to be placed adjacent to each other. The dangerous squares avoidance set is still respected. This phase is only used when the competition rules allow adjacency. If adjacency is forbidden by the rules, this phase is skipped entirely.
 
@@ -298,9 +306,7 @@ The feedback system generates structured lessons after each game. Lessons are ac
 
 - `FIRING_DODGE`: A fixed firing pattern has been detected for this opponent. The agent should avoid placing ships in the cells the opponent targets early. This directly feeds into the dangerous squares computation for placement.
 
-- `TIMING_OK`: The agent's average move time is healthy (below 50ms). No action needed.
-
-- `TIMING_RISK`: The agent's average move time is high (above 50ms), approaching the turn timeout. The agent should simplify its computations or reduce heatmap resolution.
+Timing lessons (`TIMING_OK` and `TIMING_RISK`) were removed as they generated pure noise: the agent's average decision time of 70 to 126ms is well within the 10,000ms turn timeout, and the lessons provided no actionable signal.
 
 Each lesson includes a confidence score, the number of games it is based on, baseline and result metrics, improvement gain, and an application counter. Lessons are persisted to `data/lessons.json`.
 
@@ -310,7 +316,6 @@ After every game, the feedback engine evaluates whether new lessons should be ge
 
 - A placement exploit lesson is generated when the opponent is confirmed as having fixed placement with at least 5 games of data.
 - A firing dodge lesson is generated when the opponent is confirmed as having fixed firing with at least 5 games of data.
-- Timing lessons are generated based on the average move time in the current game.
 
 Lessons are deduplicated by type and opponent. If a lesson already exists for an opponent and type, it is updated rather than duplicated.
 
@@ -418,7 +423,7 @@ heatmap_weight = trust * 5.0
 blended_score[cell] = probability_count[cell] * (1 + heatmap_weight * heatmap_frequency[cell])
 ```
 
-At trust 0.2, the heatmap weight is 1.0, providing a gentle nudge. At trust 0.8, the weight is 4.0, strongly biasing toward historically observed positions. At trust below 0.15, the heatmap is not used at all.
+At trust 0.2, the heatmap weight is 1.0, providing a gentle nudge. At trust 0.8, the weight is 4.0, strongly biasing toward historically observed positions. For high-trust opponents (trust at or above 0.7), the heatmap weight is boosted to 8.0, reflecting near-certainty about the opponent's placement habits. At trust below 0.15, the heatmap is not used at all.
 
 ## Scoring and Performance Metrics
 
@@ -471,20 +476,20 @@ Every significant event during a run is logged to a JSONL (JSON Lines) file at `
 
 ### Event Types
 
-| Event              | When                       | Key Data                                                                         |
-| ------------------ | -------------------------- | -------------------------------------------------------------------------------- |
-| `run_started`      | Engine initializes         | Configuration, competition ID                                                    |
-| `registered`       | Rules received from server | Turn timeout, number of opponents, ship classes                                  |
-| `attempt_started`  | New attempt begins         | Attempt number                                                                   |
-| `game_started`     | Game within attempt begins | Game number, opponent ID, known placement/firing flags, strategy chosen          |
-| `move`             | Each shot fired            | Turn number, row, column, result, elapsed milliseconds, strategy, confidence     |
-| `pattern_detected` | Exploitable pattern found  | Opponent ID, pattern type, games confirmed, detail                               |
-| `strategy_changed` | Mid-game strategy switch   | Old strategy, new strategy, reason                                               |
-| `game_ended`       | Game completes             | Won/lost, total moves, avg latency, improvement delta, ships lost, hits received |
-| `memory_updated`   | Opponent model persisted   | Opponent ID, trust score, stability, classification                              |
-| `attempt_ended`    | All 15 games complete      | Wins, losses, per-game summaries                                                 |
-| `learning_curve`   | Cross-attempt trend        | Aggregated win rate and move trends across attempts                              |
-| `run_ended`        | Engine shuts down          | Final statistics                                                                 |
+| Event              | When                       | Key Data                                                                                            |
+| ------------------ | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| `run_started`      | Engine initializes         | Configuration, competition ID                                                                       |
+| `registered`       | Rules received from server | Turn timeout, number of opponents, ship classes                                                     |
+| `attempt_started`  | New attempt begins         | Attempt number                                                                                      |
+| `game_started`     | Game within attempt begins | Game number, opponent ID, known placement/firing flags, strategy chosen                             |
+| `move`             | Each shot fired            | Turn number, row, column, result, elapsed milliseconds, strategy, confidence                        |
+| `pattern_detected` | Exploitable pattern found  | Opponent ID, pattern type, games confirmed, detail                                                  |
+| `strategy_changed` | Mid-game strategy switch   | Old strategy, new strategy, reason                                                                  |
+| `game_ended`       | Game completes             | Won/lost, total moves, avg latency, improvement delta, ships lost, hits received, enemy cells left  |
+| `memory_updated`   | Opponent model persisted   | Opponent ID, trust score, stability, classification                                                 |
+| `attempt_ended`    | All 15 games complete      | Wins, losses, per-game summaries                                                                    |
+| `learning_curve`   | Cross-attempt trend        | Aggregated win rate and move trends across attempts                                                 |
+| `run_ended`        | Engine shuts down          | Final statistics                                                                                    |
 
 The JSONL file is line-buffered and append-only, which allows the dashboard to stream events in real time by polling the file for new lines.
 
@@ -559,7 +564,7 @@ Server-Sent Events endpoint that streams battle events in real time. In local de
 
 ### GET /api/battle/analytics?id={battleId}
 
-Returns a comprehensive analytics JSON response for a completed battle. In local development, it reads the JSONL file directly. In production, it fetches the raw log content from the FastAPI backend at `GET /engine/raw-log?id={battleId}`. The endpoint parses the log to extract game records, patterns, memory updates, and strategy switches. It also queries Supabase for the total score and up to 15 historical runs with per-game data. The response includes KPIs, game timeline data, historical run comparisons, strategy statistics, latency distribution, per-opponent statistics, and agent lessons.
+Returns a comprehensive analytics JSON response for a completed battle. The endpoint uses a three-tier fallback for obtaining the raw JSONL log: (1) local filesystem in development mode, (2) the FastAPI backend at `GET /engine/raw-log?id={battleId}` in production, (3) the `battle_logs` table in Supabase if neither of the first two sources has the file. This ensures analytics work regardless of whether the battle was run locally or on Render. The endpoint parses the log to extract game records, patterns, memory updates, and strategy switches. It also queries Supabase for the total score and up to 15 historical runs with per-game data. The response includes KPIs, game timeline data, historical run comparisons, strategy statistics, latency distribution, per-opponent statistics, and agent lessons.
 
 ### GET /api/battle/download?id={battleId}
 
@@ -582,7 +587,9 @@ AEGIS uses a split architecture for production deployment:
 - `GET /engine/download`: Returns the formatted battle log as a text file download
 - `GET /engine/raw-log`: Returns the raw JSONL content for analytics parsing
 
-**How it works**: Each Next.js API route checks whether `ENGINE_SERVER_URL` points to localhost. If it does, it operates directly on local files and subprocesses. If it points to Render, it proxies the request to the corresponding `/engine/*` endpoint. This allows the same codebase to run in both local development and production without any code changes.
+**How it works**: Each Next.js API route checks whether `ENGINE_SERVER_URL` points to localhost. If it does, it operates directly on local files and subprocesses. If it points to Render, it proxies the request to the corresponding `/engine/*` endpoint. The analytics route additionally falls back to Supabase's `battle_logs` table when neither the filesystem nor Render has the log file. This allows the same codebase to run in both local development and production without any code changes.
+
+After each completed run, the reporter uploads the raw JSONL log to Supabase alongside the usual run metrics, game records, and opponent state. This ensures that analytics are available on Vercel even for battles that were run locally or when Render's ephemeral filesystem has been recycled.
 
 **Competition Server**: For prod competition play, the agent connects directly to `https://intern-battleship-game-server.vercel.app` using the Agent Auth protocol. The agent authenticates via `@auth/agent-cli`, receives a fresh single-use JWT per request, and plays 15 games per attempt against the competition's fixed opponent roster.
 
@@ -633,7 +640,7 @@ Features:
 
 ## Database Schema
 
-AEGIS uses Supabase (PostgreSQL) with four tables:
+AEGIS uses Supabase (PostgreSQL) with five tables:
 
 ### Battles Table
 
@@ -707,6 +714,17 @@ Stores the latest aggregated state per opponent (upserted after each run).
 | avg_survival   | real        | Average ships surviving against this opponent            |
 | exploitable    | boolean     | Whether this opponent has an exploitable pattern         |
 | updated_at     | timestamptz | Last update timestamp                                    |
+
+### Battle Logs Table
+
+Stores raw JSONL log content per battle, enabling the analytics route to serve battle data from Supabase when the log file is not available on the local filesystem or Render. The reporter uploads the log after each completed run. A backfill script (`scripts/backfill_logs_to_supabase.py`) is provided to upload existing local logs.
+
+| Column     | Type        | Description                                     |
+| ---------- | ----------- | ----------------------------------------------- |
+| id         | bigint      | Auto-incrementing primary key                   |
+| battle_id  | uuid        | Unique reference to battles table (unique)      |
+| raw_jsonl  | text        | Full JSONL log content                          |
+| created_at | timestamptz | Upload timestamp                                |
 
 ## Built With
 
@@ -833,6 +851,10 @@ AEGIS/
 |       |-- banner.webp             # Project banner image
 |       |-- battleship.webp         # Game illustration
 |
+|-- scripts/
+|   |-- backfill_logs_to_supabase.py  # Upload all local battle logs to Supabase
+|   |-- extract_render_env.py         # Extract auth env vars for Render deployment
+|
 |-- cli/
 |   |-- run.sh                       # Shell script for launching battles
 |
@@ -958,9 +980,11 @@ Create a `.env` file in the `backend/` directory:
 ```
 SUPABASE_URL=XXXXX
 SUPABASE_KEY=XXXXX
+AGENT_AUTH_AGENT_ID=XXXXX
+AGENT_AUTH_PRIVATE_KEY=XXXXX
 ```
 
-The engine reads these for Supabase reporting. If not set, reporting is silently skipped and the engine runs in local-only mode.
+The engine reads `SUPABASE_URL` and `SUPABASE_KEY` for Supabase reporting (run metrics, game records, opponent state, and raw battle logs). If not set, reporting is silently skipped and the engine runs in local-only mode. `AGENT_AUTH_AGENT_ID` and `AGENT_AUTH_PRIVATE_KEY` (Ed25519 JWK) are required for production competition play and must also be set on Render.
 
 ### Dashboard Environment Variables
 
@@ -990,18 +1014,18 @@ The `@auth/agent-cli` tool persists credentials in `~/.agent-auth`. The agent ID
 | Constant                        | Value                              | Purpose                                                       |
 | ------------------------------- | ---------------------------------- | ------------------------------------------------------------- |
 | Trust minimum                   | 0.15                               | Below this, no heatmap or memory priors are used              |
-| Trust exploit threshold         | 0.40                               | Exploit strategy becomes available                            |
-| Prediction accuracy for exploit | 0.90                               | Minimum prediction accuracy to enable exploitation            |
-| Stability for exploit           | 0.75                               | Minimum placement stability to enable exploitation            |
-| Fixed placement min games       | 8                                  | Games needed to confirm fixed placement for exploitation      |
+| Trust exploit threshold         | 0.35                               | Exploit strategy becomes available                            |
+| Prediction accuracy for exploit | 0.80 (15+ games) / 0.90           | Minimum prediction accuracy to enable exploitation            |
+| Stability for exploit           | 0.65                               | Minimum placement stability to enable exploitation            |
+| Fixed placement min games       | 5                                  | Games needed to confirm fixed placement for exploitation      |
 | Minimum moves (optimal)         | 17                                 | Theoretical minimum: all ship cells, no misses                |
 | Maximum moves (ceiling)         | 80                                 | Upper bound for move efficiency normalization                 |
 | Max history per opponent        | 30                                 | Keep last 30 games of placement/firing data                   |
-| Heatmap weight formula          | trust \* 5.0                       | Scales heatmap influence by trust level                       |
+| Heatmap weight formula          | trust \* 5.0 (8.0 if trust >= 0.7) | Scales heatmap influence by trust level                      |
 | Placement blend                 | 0.7 observed + 0.3 prior           | Blend of observed frequency and occupancy prior for placement |
 | Bandit exploration minimum      | 3 games                            | Force uniform random sampling until each arm has 3 games      |
 | Composite reward weights        | 0.5 win + 0.3 moves + 0.2 survival | Multi-objective reward for bandit updates                     |
 | Edge bias probability           | 60%                                | Chance of placing ship start on outer two rows/columns        |
 | Dangerous square threshold      | 0.5 \* games_played                | Frequency threshold for flagging cells as dangerous           |
-| Candidate placements            | 50                                 | Number of random placements evaluated for defensive scoring   |
+| Candidate placements            | 500                                | Number of random placements evaluated for defensive scoring   |
 | Model reset threshold           | pred_acc below 0.15                | Triggers full history reset if model is severely wrong        |
