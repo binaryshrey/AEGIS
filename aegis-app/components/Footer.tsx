@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-const GITHUB_URI = "https://github.com/binaryshrey/";
+const GITHUB_URI = "https://github.com/binaryshrey/AEGIS";
 const LINKEDIN_URI = "https://in.linkedin.com/in/shreyanshsaurabh";
 const BETTERSTACK_URI = "";
 

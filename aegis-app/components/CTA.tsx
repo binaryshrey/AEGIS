@@ -19,7 +19,7 @@ export function CTA({
   primaryButtonText = "Get started",
   primaryButtonHref = "/dashboard",
   secondaryButtonText = "Learn more",
-  secondaryButtonHref = "https://github.com/binaryshrey/",
+  secondaryButtonHref = "https://github.com/binaryshrey/AEGIS",
 }: CTAProps) {
   return (
     <section className="overflow-hidden bg-black py-20 pt-40 pb-40">
