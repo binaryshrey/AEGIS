@@ -1,5 +1,7 @@
 # AEGIS: Adaptive Exploitation & Game Intelligence System ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white) ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) ![NumPy](https://img.shields.io/badge/NumPy-013243?logo=numpy&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/snapshot.webp)
+
 AEGIS is an autonomous closed-loop battleship agent that detects opponent placement and firing patterns, exploits them through Thompson Sampling and Bayesian inference, and climbs the leaderboard faster with every game it plays. The system includes a full-featured real-time dashboard for monitoring battles, analyzing performance, and reviewing the agent's learning process across multiple runs. It also features an AI-powered chat assistant for strategy and observability questions, and a CLI for launching battles from the terminal.
 
 AEGIS was built for the StarSling Intern Competition, where autonomous agents compete in a series of Battleship games against a diverse roster of opponents. The agent does not receive any prior information about its opponents. Instead, it builds opponent models from scratch, classifies their behavior, computes a trust score for each model, and selects the optimal targeting strategy using a multi-armed bandit. Every decision the agent makes is logged, persisted, and available for real-time visualization in the dashboard.
@@ -503,9 +505,15 @@ The dashboard is a Next.js web application that provides real-time monitoring, h
 
 **Dashboard (/dashboard)**: The main overview page. Displays four KPI cards (Best Score, Avg Moves per Game, Fleet Survival, Win Rate) with delta indicators comparing the latest run to the previous run. Below the KPIs, the page shows an Opponent Intelligence section with stats (total modeled, exploitable count, avg trust, avg win rate), a classification distribution bar with tooltips showing which block belongs to which opponent class, and a run leaderboard. At the bottom is a Battle History table showing all runs with clickable rows that navigate to the analytics page. The table includes a "Download logs" action in the three-dot menu for each run, which downloads the raw JSONL battle log as a formatted text file. A floating AI chat bar is available for asking strategy and observability questions.
 
-**Battle Arena (/battle-arena)**: The live battle monitoring page. When a battle is started, this page connects to a Server-Sent Events (SSE) stream and displays the agent's decision-making process in real time. The left side shows an interactive workflow canvas with six agent nodes (Opponent Profiler, Defensive Ship Placement, Thompson Bandit Selector, Probability Targeting Engine, ReAct Decision Loop, Memory and Learning), each with three child nodes that light up as the corresponding events are received. The right side shows a scrolling log panel with timestamped, color-coded battle events. When the battle completes, a "Get Battle Analysis" button appears in the header.
+**Battle Arena (/battle-arena)**: 
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/arena.webp)
+The live battle monitoring page. When a battle is started, this page connects to a Server-Sent Events (SSE) stream and displays the agent's decision-making process in real time. The left side shows an interactive workflow canvas with six agent nodes (Opponent Profiler, Defensive Ship Placement, Thompson Bandit Selector, Probability Targeting Engine, ReAct Decision Loop, Memory and Learning), each with three child nodes that light up as the corresponding events are received. The right side shows a scrolling log panel with timestamped, color-coded battle events. When the battle completes, a "Get Battle Analysis" button appears in the header.
 
-**Battle Analytics (/battle-analytics)**: When accessed without a battle ID, this page shows the Battle History table for selecting a run to analyze. When accessed with a battle ID (e.g., `/battle-analytics?id=<uuid>`), it displays comprehensive analytics including KPI cards (Win Rate, Avg Moves, Avg Latency, Patterns Found, Total Score), a Cumulative Win Rate chart with overlays from up to 15 historical runs, a Move Efficiency chart comparing actual moves to baseline with historical overlays, strategy comparison radar and distribution donut charts, a latency distribution histogram, a per-opponent win rate bar chart, an Opponent Intelligence table with classification, trust scores, and exploitability indicators, and an Agent Feedback Loop section showing detected patterns and lessons. A floating AI chat bar is also available on this page for contextual questions about the battle results.
+**Battle Analytics (/battle-analytics)**: 
+
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/analytics.webp)
+
+When accessed without a battle ID, this page shows the Battle History table for selecting a run to analyze. When accessed with a battle ID (e.g., `/battle-analytics?id=<uuid>`), it displays comprehensive analytics including KPI cards (Win Rate, Avg Moves, Avg Latency, Patterns Found, Total Score), a Cumulative Win Rate chart with overlays from up to 15 historical runs, a Move Efficiency chart comparing actual moves to baseline with historical overlays, strategy comparison radar and distribution donut charts, a latency distribution histogram, a per-opponent win rate bar chart, an Opponent Intelligence table with classification, trust scores, and exploitability indicators, and an Agent Feedback Loop section showing detected patterns and lessons. A floating AI chat bar is also available on this page for contextual questions about the battle results.
 
 ### Real-Time Battle Streaming
 
@@ -532,6 +540,8 @@ All charts use ApexCharts (via react-apexcharts) with a dark theme:
 - **Per-Opponent Win Rate**: Horizontal bar chart with color-coding for exploited vs non-exploited opponents.
 
 ## AI Chat Assistant
+
+![](https://raw.githubusercontent.com/binaryshrey/AEGIS/refs/heads/main/aegis-app/public/chat.webp)
 
 AEGIS includes a floating chat bar on the Dashboard and Battle Analytics pages, powered by OpenRouter with GPT-4.1. The chat assistant uses this README as its knowledge base, allowing users to ask questions about the agent's strategies, architecture, and performance.
 
