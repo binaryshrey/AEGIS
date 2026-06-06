@@ -609,17 +609,26 @@ AEGIS includes a CLI for launching battles from the terminal without the dashboa
 
 ### Shell Script (`cli/run.sh`)
 
-A convenience script that sets up the environment and runs the engine:
+A convenience script that sets up the environment and runs the engine. It wraps `engine.play`, so the default routes to the real competition server (`https://intern-battleship-game-server.vercel.app`) with Agent Auth.
 
 ```bash
-# Production (against Render backend)
+# First run only: approve agent via device authorization flow
+./cli/run.sh --connect
+
+# Production (against the real competition server)
 ./cli/run.sh
 
-# Local development (against localhost:5001)
+# Local development (against localhost:5001 mock server)
 ./cli/run.sh --local
+
+# Multiple self-improving attempts
+./cli/run.sh --rounds 5
+
+# Print past score history
+./cli/run.sh --history
 ```
 
-The script auto-creates a Python virtual environment and installs dependencies if needed.
+The script auto-creates a Python virtual environment and installs dependencies if needed. Prod runs require `AGENT_AUTH_AGENT_ID` and `AGENT_AUTH_PRIVATE_KEY` to be set in the environment. All flags after `--local` are forwarded to `engine.play`.
 
 ### Python Entry Point (`engine/play.py`)
 

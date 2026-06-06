@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # AEGIS CLI — Launch a battle
 # Usage:
-#   ./run.sh              (prod — uses https://aegis-n8at.onrender.com)
-#   ./run.sh --local      (dev  — uses http://localhost:5001)
+#   ./run.sh              (prod  — real competition: https://intern-battleship-game-server.vercel.app)
+#   ./run.sh --local      (dev   — local mock server: http://localhost:5001)
+#   ./run.sh --connect    (first run only — approve agent via device flow)
+#   ./run.sh --rounds 5   (multiple attempts, self-improving)
+#   ./run.sh --history    (print past score history and exit)
+#
+# Prod auth requires AGENT_AUTH_AGENT_ID and AGENT_AUTH_PRIVATE_KEY env vars.
 
 set -e
 
@@ -11,15 +16,11 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 VENV_DIR="$SCRIPT_DIR/venv"
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
-# Defaults (prod)
-SERVER_URL="https://aegis-n8at.onrender.com"
-COMPETITION="mock-competition"
-
-# Check for --local flag
+# Translate --local → --mock for engine.play; pass everything else through
 EXTRA_ARGS=()
 for arg in "$@"; do
   if [ "$arg" = "--local" ]; then
-    SERVER_URL="http://localhost:5001"
+    EXTRA_ARGS+=("--mock")
   else
     EXTRA_ARGS+=("$arg")
   fi
@@ -42,12 +43,6 @@ if [ ! -f "$VENV_DIR/.installed" ]; then
   touch "$VENV_DIR/.installed"
 fi
 
-echo "Server: $SERVER_URL"
-
-# Run the engine from the project root
+# Run the prod entry point — handles real competition routing, auth, and retry
 cd "$PROJECT_ROOT"
-python -m engine.main \
-  --url "$SERVER_URL" \
-  --competition "$COMPETITION" \
-  --rounds 1 \
-  "${EXTRA_ARGS[@]}"
+python -m engine.play "${EXTRA_ARGS[@]}"
